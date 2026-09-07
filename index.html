@@ -1185,7 +1185,10 @@ function renderOpen(){
     btn.addEventListener('click', ()=> openCompleteScreen(btn.dataset.id));
   });
   wrap.querySelectorAll('button[data-act="delopen"]').forEach(btn=>{
-    btn.addEventListener('click', ()=> confirmCancelOpen(btn.dataset.id));
+    btn.addEventListener('click', ()=>{
+      if (!checkPin('İptal etme')) return;
+      confirmCancelOpen(btn.dataset.id);
+    });
   });
 }
 
