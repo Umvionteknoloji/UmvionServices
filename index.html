@@ -4,8 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Umvion Teknoloji — Servis Formu</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#13202b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Umvion Servis">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/signature_pad/4.1.7/signature_pad.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
@@ -111,6 +119,44 @@
   .filters button{font-family:"Inter",sans-serif;border:1px solid var(--line);background:#fff;border-radius:var(--radius);font-size:.82rem;color:var(--slate);cursor:pointer;}
 
   .rec-count{font-family:"Inter",sans-serif;font-size:.75rem;color:var(--slate-soft);margin-bottom:10px;}
+  .rec-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .rec-toolbar .rec-count{margin-bottom:0;}
+  .rec-toolbar button{font-size:.78rem;padding:8px 14px;}
+
+  .dur-badge{
+    font-family:"Inter",sans-serif;font-size:.68rem;font-weight:600;padding:2px 7px;
+    border-radius:10px;display:inline-block;margin-top:3px;
+  }
+  .dur-badge.ok{background:var(--ok-dim);color:var(--ok);}
+  .dur-badge.warn{background:var(--amber-dim);color:var(--amber);}
+  .dur-badge.late{background:var(--signal-dim);color:var(--signal);}
+
+  .stat-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:26px;}
+  .stat-card{
+    background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;
+    font-family:"Inter",sans-serif;
+  }
+  .stat-card .num{font-family:"Iowan Old Style",Georgia,serif;font-size:1.8rem;color:var(--ink);line-height:1;}
+  .stat-card .lbl{font-size:.72rem;color:var(--slate-soft);margin-top:6px;}
+
+  .stat-table-title{font-family:"Inter",sans-serif;font-size:.78rem;font-weight:600;color:var(--slate);margin:22px 0 10px;}
+  table.stat-table{width:100%;border-collapse:collapse;font-family:"Inter",sans-serif;font-size:.85rem;}
+  table.stat-table th{text-align:left;font-weight:500;color:var(--slate-soft);font-size:.72rem;padding:0 10px 8px;border-bottom:1px solid var(--line);}
+  table.stat-table td{padding:9px 10px;border-bottom:1px solid var(--line);}
+  table.stat-table td.num-cell{text-align:right;font-variant-numeric:tabular-nums;}
+
+  .photo-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;}
+  .photo-thumb{position:relative;width:88px;height:88px;border-radius:4px;overflow:hidden;border:1px solid var(--line);}
+  .photo-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+  .photo-thumb button{
+    position:absolute;top:2px;right:2px;background:rgba(19,32,43,.75);color:#fff;border:none;
+    border-radius:50%;width:20px;height:20px;font-size:.7rem;cursor:pointer;line-height:1;
+  }
+  .photo-add-btn{
+    width:88px;height:88px;border:1px dashed var(--line);border-radius:4px;background:#fff;
+    color:var(--slate-soft);font-family:"Inter",sans-serif;font-size:.7rem;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  }
 
   table.recs{width:100%;border-collapse:collapse;font-family:"Inter",sans-serif;font-size:.85rem;}
   table.recs th{text-align:left;font-weight:500;color:var(--slate-soft);font-size:.72rem;padding:0 10px 8px;border-bottom:1px solid var(--line);}
@@ -188,6 +234,7 @@
     <button class="active" data-tab="new">Yeni Servis Aç</button>
     <button data-tab="open">Açık Servisler <span class="count" id="openCount">0</span></button>
     <button data-tab="list">Geçmiş Kayıtlar</button>
+    <button data-tab="stats">İstatistikler</button>
   </nav>
 </header>
 
@@ -213,11 +260,11 @@
         <div class="row2">
           <div class="field">
             <label for="s_teknisyen">Servisi veren teknisyen</label>
-            <input type="text" id="s_teknisyen" placeholder="Örn. Ahmet Yılmaz" required>
+            <input type="text" id="s_teknisyen" placeholder="Örn. Ahmet Yılmaz" list="teknisyenList" required>
           </div>
           <div class="field">
             <label for="s_musteri">Müşteri / mağaza adı</label>
-            <input type="text" id="s_musteri" placeholder="Örn. Nova Elektronik - Kadıköy" required>
+            <input type="text" id="s_musteri" placeholder="Örn. Nova Elektronik - Kadıköy" list="musteriList" required>
           </div>
         </div>
         <div class="row2">
@@ -275,6 +322,13 @@
           <div class="field">
             <label for="m_yetkili">Servis alan yetkili kişi</label>
             <input type="text" id="m_yetkili" placeholder="İmzalayacak kişinin adı">
+          </div>
+          <div class="field">
+            <label>Fotoğraflar (isteğe bağlı, en fazla 2)</label>
+            <div class="photo-row" id="m_photo_row">
+              <button type="button" class="photo-add-btn" id="m_photo_add">📷<span>Ekle</span></button>
+            </div>
+            <input type="file" accept="image/*" capture="environment" id="m_photo_input" style="display:none;">
           </div>
         </fieldset>
 
@@ -345,6 +399,13 @@
           <label for="c_yetkili">Servis alan yetkili kişi</label>
           <input type="text" id="c_yetkili" placeholder="İmzalayacak kişinin adı">
         </div>
+        <div class="field">
+          <label>Fotoğraflar (isteğe bağlı, en fazla 2)</label>
+          <div class="photo-row" id="c_photo_row">
+            <button type="button" class="photo-add-btn" id="c_photo_add">📷<span>Ekle</span></button>
+          </div>
+          <input type="file" accept="image/*" capture="environment" id="c_photo_input" style="display:none;">
+        </div>
       </fieldset>
 
       <fieldset>
@@ -389,7 +450,7 @@
           </div>
           <div class="field">
             <label for="e_musteri">Müşteri / mağaza adı</label>
-            <input type="text" id="e_musteri">
+            <input type="text" id="e_musteri" list="musteriList">
           </div>
         </div>
         <div class="row2">
@@ -446,6 +507,13 @@
           <label for="e_yetkili">Servis alan yetkili kişi</label>
           <input type="text" id="e_yetkili">
         </div>
+        <div class="field">
+          <label>Fotoğraflar (isteğe bağlı, en fazla 2)</label>
+          <div class="photo-row" id="e_photo_row">
+            <button type="button" class="photo-add-btn" id="e_photo_add">📷<span>Ekle</span></button>
+          </div>
+          <input type="file" accept="image/*" capture="environment" id="e_photo_input" style="display:none;">
+        </div>
       </fieldset>
 
       <fieldset>
@@ -491,8 +559,8 @@
   <!-- ============ HISTORY / COMPLETED RECORDS ============ -->
   <section id="tab-list">
     <div class="filters">
-      <input type="text" id="filt_musteri" placeholder="Müşteri / mağaza ara">
-      <input type="text" id="filt_teknisyen" placeholder="Teknisyen ara">
+      <input type="text" id="filt_musteri" placeholder="Müşteri / mağaza ara" list="musteriList">
+      <input type="text" id="filt_teknisyen" placeholder="Teknisyen ara" list="teknisyenList">
       <input type="date" id="filt_tarih">
       <select id="filt_tur">
         <option value="">Tüm kayıt türleri</option>
@@ -501,11 +569,29 @@
       </select>
       <button id="filt_clear">Filtreleri temizle</button>
     </div>
-    <div class="rec-count" id="recCount"></div>
+    <div class="rec-toolbar">
+      <div class="rec-count" id="recCount"></div>
+      <button class="ghost" id="exportExcelBtn">Excel'e aktar</button>
+    </div>
     <div id="recWrap"></div>
   </section>
 
+  <!-- ============ STATISTICS ============ -->
+  <section id="tab-stats">
+    <div class="filters" style="grid-template-columns:1fr auto;">
+      <select id="stats_period">
+        <option value="all">Tüm zamanlar</option>
+        <option value="month" selected>Bu ay</option>
+        <option value="week">Son 7 gün</option>
+      </select>
+    </div>
+    <div id="statsWrap"></div>
+  </section>
+
 </div>
+
+<datalist id="musteriList"></datalist>
+<datalist id="teknisyenList"></datalist>
 
 <div class="modal-bg" id="modalBg">
   <div class="modal" id="modalBody"></div>
@@ -588,9 +674,11 @@ function startRealtimeSync(){
     (snapshot) => {
       allRecords = snapshot.docs.map(d => d.data());
       document.getElementById('openCount').textContent = allRecords.filter(r=>r.status==='open').length;
+      refreshAutocompleteLists();
       const activeSection = document.querySelector('.shell section.active');
       if (activeSection && activeSection.id === 'tab-open') renderOpen();
       if (activeSection && activeSection.id === 'tab-list') renderHistory();
+      if (activeSection && activeSection.id === 'tab-stats') renderStats();
     },
     (err) => { console.error('Canlı senkronizasyon hatası:', err); }
   );
@@ -635,6 +723,7 @@ function activateTab(name){
   document.getElementById('tab-'+name).classList.add('active');
   if (name === 'list') renderHistory();
   if (name === 'open') renderOpen();
+  if (name === 'stats') renderStats();
 }
 document.querySelectorAll('nav.tabs button').forEach(btn=>{
   btn.addEventListener('click', ()=> activateTab(btn.dataset.tab));
@@ -779,6 +868,24 @@ function nowParts(){
     iso: d.toISOString()
   };
 }
+function formatDuration(startISO, endISO){
+  if (!startISO) return '—';
+  const start = new Date(startISO).getTime();
+  const end = endISO ? new Date(endISO).getTime() : Date.now();
+  let mins = Math.max(0, Math.round((end - start) / 60000));
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h === 0) return `${m}dk`;
+  return `${h}sa ${m}dk`;
+}
+function durationClass(startISO, endISO){
+  const start = new Date(startISO).getTime();
+  const end = endISO ? new Date(endISO).getTime() : Date.now();
+  const hours = (end - start) / 3600000;
+  if (hours < 1.5) return 'ok';
+  if (hours < 3) return 'warn';
+  return 'late';
+}
 function formatDate(iso){
   if (!iso) return '—';
   const [y,m,d] = iso.split('-');
@@ -792,6 +899,113 @@ function slug(s){
 }
 
 /* ============================================================
+   PHOTOS — capture from camera/gallery, compress client-side
+   (keeps Firestore documents well under the 1MB limit), up to
+   2 photos per form. Shared logic for manual/complete/edit screens.
+   ============================================================ */
+const photoState = { m: [], c: [], e: [] };
+
+function compressImage(file, maxWidth, quality){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > maxWidth){ h = Math.round(h * (maxWidth / w)); w = maxWidth; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => reject(new Error('Görsel okunamadı.'));
+      img.src = e.target.result;
+    };
+    reader.onerror = () => reject(new Error('Dosya okunamadı.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderPhotoRow(prefix){
+  const row = document.getElementById(prefix + '_photo_row');
+  const addBtn = document.getElementById(prefix + '_photo_add');
+  if (!row || !addBtn) return;
+  row.querySelectorAll('.photo-thumb').forEach(el => el.remove());
+  photoState[prefix].forEach((dataUrl, idx) => {
+    const thumb = document.createElement('div');
+    thumb.className = 'photo-thumb';
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.textContent = '×';
+    delBtn.addEventListener('click', ()=>{
+      photoState[prefix].splice(idx, 1);
+      renderPhotoRow(prefix);
+    });
+    thumb.appendChild(img);
+    thumb.appendChild(delBtn);
+    row.insertBefore(thumb, addBtn);
+  });
+  addBtn.style.display = photoState[prefix].length >= 2 ? 'none' : 'flex';
+}
+
+function setupPhotoPicker(prefix){
+  const addBtn = document.getElementById(prefix + '_photo_add');
+  const input = document.getElementById(prefix + '_photo_input');
+  if (!addBtn || !input) return;
+  addBtn.addEventListener('click', ()=> input.click());
+  input.addEventListener('change', async ()=>{
+    const file = input.files[0];
+    input.value = '';
+    if (!file) return;
+    if (photoState[prefix].length >= 2) return;
+    try{
+      const dataUrl = await compressImage(file, 900, 0.6);
+      photoState[prefix].push(dataUrl);
+      renderPhotoRow(prefix);
+    }catch(err){
+      console.error(err);
+      alert('Fotoğraf işlenemedi, tekrar deneyin.');
+    }
+  });
+  renderPhotoRow(prefix);
+}
+function resetPhotos(prefix){ photoState[prefix] = []; renderPhotoRow(prefix); }
+function setPhotos(prefix, arr){ photoState[prefix] = Array.isArray(arr) ? arr.slice(0,2) : []; renderPhotoRow(prefix); }
+setupPhotoPicker('m');
+setupPhotoPicker('c');
+setupPhotoPicker('e');
+
+/* ============================================================
+   AUTOCOMPLETE LISTS — müşteri / teknisyen isimleri, geçmiş
+   kayıtlardan çıkarılır, <datalist> olarak forma bağlanır.
+   ============================================================ */
+function refreshAutocompleteLists(){
+  const musteriler = [...new Set(allRecords.map(r=>r.musteri).filter(Boolean))].sort();
+  const teknisyenler = [...new Set(allRecords.map(r=>r.teknisyen).filter(Boolean))].sort();
+  const musteriList = document.getElementById('musteriList');
+  const teknisyenList = document.getElementById('teknisyenList');
+  if (musteriList) musteriList.innerHTML = musteriler.map(m=>`<option value="${escapeHtml(m)}">`).join('');
+  if (teknisyenList) teknisyenList.innerHTML = teknisyenler.map(t=>`<option value="${escapeHtml(t)}">`).join('');
+}
+
+/* ============================================================
+   REMEMBER LAST TECHNICIAN — this is a real deployed website
+   (not a sandboxed artifact), so localStorage works normally.
+   ============================================================ */
+function rememberTeknisyen(name){
+  try{ localStorage.setItem('umvion_last_teknisyen', name || ''); }catch(e){}
+}
+function prefillRememberedTeknisyen(){
+  try{
+    const last = localStorage.getItem('umvion_last_teknisyen');
+    if (last) document.getElementById('s_teknisyen').value = last;
+  }catch(e){}
+}
+
+/* ============================================================
    STEP 1 — START A SERVICE (stamps giriş tarihi/saati, locked)
    or create a full MANUAL / retroactive record directly.
    ============================================================ */
@@ -801,6 +1015,7 @@ function clearStartForm(){
     document.getElementById(id).value = '';
   });
   if (manualPadsReady){ padTeknisyenM.clear(); padMusteriM.clear(); }
+  resetPhotos('m');
 }
 
 document.getElementById('resetStartBtn').addEventListener('click', ()=>{
@@ -844,13 +1059,15 @@ document.getElementById('startBtn').addEventListener('click', async ()=>{
         girisISO: np.iso,
         islem: '', malzeme: '', yetkili: '',
         sigTeknisyen: null, sigMusteri: null,
-        cikisTarihi: null, cikisSaati: null, cikisISO: null
+        cikisTarihi: null, cikisSaati: null, cikisISO: null,
+        fotograflar: []
       };
 
       startBtn.disabled = true; startBtn.textContent = busyLabel;
       const res = await withTimeout(saveRecord(rec), 15000, 'Kayıt');
       if (!res) throw new Error('depolama yanıtı boş');
 
+      rememberTeknisyen(teknisyen);
       clearStartForm();
       showToast('newToast','ok',`Servis başlatıldı — giriş ${np.saat}. "Açık Servisler" sekmesinden devam edebilirsiniz.`);
       await refreshAll();
@@ -900,13 +1117,15 @@ document.getElementById('startBtn').addEventListener('click', async ()=>{
         sigMusteri: padMusteriM.toDataURL('image/png'),
         cikisTarihi: cikisTarihi,
         cikisSaati: cikisSaati,
-        cikisISO: new Date(`${cikisTarihi}T${cikisSaati}:00`).toISOString()
+        cikisISO: new Date(`${cikisTarihi}T${cikisSaati}:00`).toISOString(),
+        fotograflar: photoState.m.slice()
       };
 
       startBtn.disabled = true; startBtn.textContent = busyLabel;
       const res = await withTimeout(saveRecord(rec), 15000, 'Kayıt');
       if (!res) throw new Error('depolama yanıtı boş');
 
+      rememberTeknisyen(teknisyen);
       clearStartForm();
       showToast('newToast','ok','Manuel servis kaydı oluşturuldu. "Geçmiş Kayıtlar" sekmesinden görebilirsiniz.');
       await refreshAll();
@@ -936,10 +1155,13 @@ function renderOpen(){
     return;
   }
 
-  const rows = openRecs.map(r=>`
+  const rows = openRecs.map(r=>{
+    const dc = durationClass(r.girisISO, null);
+    const durLabel = { ok:'', warn:'⚠ ', late:'⏰ ' }[dc] + formatDuration(r.girisISO, null) + ' açık';
+    return `
     <tr data-id="${r.id}">
       <td class="sans"><span class="badge open">AÇIK</span></td>
-      <td class="sans">${formatDate(r.girisTarihi)}<br><span style="color:var(--slate-soft);">${r.girisSaati}</span></td>
+      <td class="sans">${formatDate(r.girisTarihi)}<br><span style="color:var(--slate-soft);">${r.girisSaati}</span><br><span class="dur-badge ${dc}">${durLabel}</span></td>
       <td class="sans cust">${escapeHtml(r.musteri)}</td>
       <td class="sans">${escapeHtml(r.teknisyen)}</td>
       <td class="sans desc-cell" title="${escapeHtml(r.ariza)}">${escapeHtml(r.ariza || '—')}</td>
@@ -950,7 +1172,7 @@ function renderOpen(){
         </div>
       </td>
     </tr>
-  `).join('');
+  `;}).join('');
 
   wrap.innerHTML = `
     <table class="recs">
@@ -1010,6 +1232,7 @@ function openCompleteScreen(id){
   document.getElementById('c_islem').value = r.islem || '';
   document.getElementById('c_malzeme').value = r.malzeme || '';
   document.getElementById('c_yetkili').value = r.yetkili || '';
+  setPhotos('c', r.fotograflar || []);
   if (sigPadsReady){ padTeknisyenC.clear(); padMusteriC.clear(); }
   showToast('completeToast','','');
 
@@ -1065,6 +1288,7 @@ document.getElementById('finishBtn').addEventListener('click', async ()=>{
     r.cikisSaati = np.saat;
     r.cikisISO = np.iso;
     r.status = 'completed';
+    r.fotograflar = photoState.c.slice();
 
     const finishBtn = document.getElementById('finishBtn');
     finishBtn.disabled = true; finishBtn.textContent = 'Kaydediliyor…';
@@ -1101,6 +1325,7 @@ function renderHistory(){
     return true;
   }).sort((a,b)=> (b.cikisISO||'').localeCompare(a.cikisISO||''));
 
+  lastFilteredHistory = filtered;
   document.getElementById('recCount').textContent = filtered.length + ' kayıt' + (filtered.length !== completed.length ? ' (toplam ' + completed.length + ')' : '');
 
   const wrap = document.getElementById('recWrap');
@@ -1121,6 +1346,7 @@ function renderHistory(){
     <tr data-id="${r.id}">
       <td class="sans">${turBadge}</td>
       <td class="sans">${formatDate(r.girisTarihi)}<br><span style="color:var(--slate-soft);">${r.girisSaati} – ${r.cikisSaati||'—'}</span></td>
+      <td class="sans">${formatDuration(r.girisISO, r.cikisISO)}</td>
       <td class="sans cust">${escapeHtml(r.musteri)}</td>
       <td class="sans">${escapeHtml(r.teknisyen)}</td>
       <td class="sans desc-cell" title="${escapeHtml(r.islem)}">${escapeHtml(r.islem || '—')}</td>
@@ -1136,7 +1362,7 @@ function renderHistory(){
 
   wrap.innerHTML = `
     <table class="recs">
-      <thead><tr><th>Tür</th><th>Giriş / Çıkış</th><th>Müşteri / Mağaza</th><th>Teknisyen</th><th>Yapılan işlem</th><th>İşlemler</th></tr></thead>
+      <thead><tr><th>Tür</th><th>Giriş / Çıkış</th><th>Süre</th><th>Müşteri / Mağaza</th><th>Teknisyen</th><th>Yapılan işlem</th><th>İşlemler</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
   `;
@@ -1145,6 +1371,7 @@ function renderHistory(){
     btn.addEventListener('click', ()=> handleHistoryAction(btn.dataset.act, btn.dataset.id));
   });
 }
+let lastFilteredHistory = [];
 ['filt_musteri','filt_teknisyen','filt_tarih','filt_tur'].forEach(id=>{
   document.getElementById(id).addEventListener('input', renderHistory);
   document.getElementById(id).addEventListener('change', renderHistory);
@@ -1156,6 +1383,121 @@ document.getElementById('filt_clear').addEventListener('click', ()=>{
   document.getElementById('filt_tur').value = '';
   renderHistory();
 });
+
+/* ============================================================
+   EXCEL EXPORT — exports the currently filtered history rows.
+   ============================================================ */
+document.getElementById('exportExcelBtn').addEventListener('click', ()=>{
+  try{
+    if (typeof XLSX === 'undefined'){
+      alert('Excel kütüphanesi yüklenemedi. Sayfayı yenileyip tekrar deneyin.');
+      return;
+    }
+    if (!lastFilteredHistory.length){
+      alert('Dışa aktarılacak kayıt yok. Filtreleri kontrol edin.');
+      return;
+    }
+    const rows = lastFilteredHistory.map(r => ({
+      'Kayıt Türü': (r.kayitTuru || 'otomatik') === 'manuel' ? 'Manuel' : 'Otomatik',
+      'Giriş Tarihi': formatDate(r.girisTarihi),
+      'Giriş Saati': r.girisSaati || '',
+      'Çıkış Tarihi': formatDate(r.cikisTarihi),
+      'Çıkış Saati': r.cikisSaati || '',
+      'Süre': formatDuration(r.girisISO, r.cikisISO),
+      'Teknisyen': r.teknisyen || '',
+      'Müşteri / Mağaza': r.musteri || '',
+      'Telefon': r.telefon || '',
+      'Adres': r.adres || '',
+      'Servis Nedeni': r.ariza || '',
+      'Yapılan İşlem': r.islem || '',
+      'Kullanılan Malzeme': r.malzeme || '',
+      'Yetkili': r.yetkili || '',
+      'Belge No': r.id
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = Object.keys(rows[0]).map(k => ({ wch: Math.min(Math.max(k.length, 12), 40) }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Servis Kayıtları');
+    const stamp = nowParts().tarih;
+    XLSX.writeFile(wb, `umvion-servis-kayitlari-${stamp}.xlsx`);
+  }catch(err){
+    console.error(err);
+    alert('Excel dosyası oluşturulamadı: ' + (err && err.message ? err.message : 'bilinmeyen hata'));
+  }
+});
+
+/* ============================================================
+   STATISTICS TAB
+   ============================================================ */
+document.getElementById('stats_period').addEventListener('change', renderStats);
+
+function renderStats(){
+  const period = document.getElementById('stats_period').value;
+  const now = new Date();
+  const completed = allRecords.filter(r=>r.status==='completed');
+
+  const inPeriod = completed.filter(r=>{
+    if (period === 'all') return true;
+    const d = new Date(r.girisISO || (r.girisTarihi ? r.girisTarihi+'T00:00:00' : null));
+    if (isNaN(d)) return false;
+    if (period === 'month'){
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }
+    if (period === 'week'){
+      const weekAgo = new Date(now.getTime() - 7*24*60*60*1000);
+      return d >= weekAgo;
+    }
+    return true;
+  });
+
+  const wrap = document.getElementById('statsWrap');
+  if (inPeriod.length === 0){
+    wrap.innerHTML = `<div class="empty"><div class="big">Bu aralıkta kayıt yok</div><div>Farklı bir dönem seçmeyi deneyin.</div></div>`;
+    return;
+  }
+
+  const totalCount = inPeriod.length;
+  const manualCount = inPeriod.filter(r => (r.kayitTuru||'otomatik')==='manuel').length;
+  const autoCount = totalCount - manualCount;
+  const openNow = allRecords.filter(r=>r.status==='open').length;
+
+  const durations = inPeriod.map(r=>{
+    const s = new Date(r.girisISO).getTime();
+    const e = new Date(r.cikisISO).getTime();
+    return (isNaN(s)||isNaN(e)) ? null : (e-s)/60000;
+  }).filter(x=>x!==null);
+  const avgMin = durations.length ? Math.round(durations.reduce((a,b)=>a+b,0)/durations.length) : 0;
+  const avgLabel = avgMin >= 60 ? `${Math.floor(avgMin/60)}sa ${avgMin%60}dk` : `${avgMin}dk`;
+
+  const byTek = {};
+  inPeriod.forEach(r=>{ const k = r.teknisyen || '—'; byTek[k] = (byTek[k]||0)+1; });
+  const tekRows = Object.entries(byTek).sort((a,b)=>b[1]-a[1]);
+
+  const byMusteri = {};
+  inPeriod.forEach(r=>{ const k = r.musteri || '—'; byMusteri[k] = (byMusteri[k]||0)+1; });
+  const musteriRows = Object.entries(byMusteri).sort((a,b)=>b[1]-a[1]).slice(0,10);
+
+  wrap.innerHTML = `
+    <div class="stat-cards">
+      <div class="stat-card"><div class="num">${totalCount}</div><div class="lbl">Toplam tamamlanan servis</div></div>
+      <div class="stat-card"><div class="num">${openNow}</div><div class="lbl">Şu an açık servis</div></div>
+      <div class="stat-card"><div class="num">${avgLabel}</div><div class="lbl">Ortalama servis süresi</div></div>
+      <div class="stat-card"><div class="num">${autoCount} / ${manualCount}</div><div class="lbl">Otomatik / Manuel kayıt</div></div>
+    </div>
+
+    <div class="stat-table-title sans">TEKNİSYEN BAŞINA SERVİS SAYISI</div>
+    <table class="stat-table">
+      <thead><tr><th>Teknisyen</th><th style="text-align:right;">Servis Sayısı</th></tr></thead>
+      <tbody>${tekRows.map(([name,count])=>`<tr><td>${escapeHtml(name)}</td><td class="num-cell">${count}</td></tr>`).join('')}</tbody>
+    </table>
+
+    <div class="stat-table-title sans">EN ÇOK SERVİS VERİLEN MÜŞTERİ / MAĞAZALAR</div>
+    <table class="stat-table">
+      <thead><tr><th>Müşteri / Mağaza</th><th style="text-align:right;">Servis Sayısı</th></tr></thead>
+      <tbody>${musteriRows.map(([name,count])=>`<tr><td>${escapeHtml(name)}</td><td class="num-cell">${count}</td></tr>`).join('')}</tbody>
+    </table>
+  `;
+}
 
 /* ============================================================
    PDF GENERATION
@@ -1288,6 +1630,33 @@ function buildPdf(r){
 
   y += sigBoxH + 30;
 
+  // --- photos, if any (compressed client-side before upload) ---
+  if (r.fotograflar && r.fotograflar.length){
+    const neededH = 170;
+    if (y + neededH > PAGE_H - BORDER - 44){
+      doc.addPage();
+      doc.setDrawColor(200); doc.setLineWidth(1);
+      doc.roundedRect(BORDER, BORDER, PAGE_W - 2*BORDER, PAGE_H - 2*BORDER, 4, 4);
+      y = M + 6;
+    }
+    labelStyle();
+    doc.text('FOTOĞRAFLAR', M, y);
+    y += 10;
+    const photos = r.fotograflar.slice(0, 2);
+    const photoGap = 16;
+    const photoH = 150;
+    const photoW = photos.length === 1 ? 220 : (CONTENT_W - photoGap) / 2;
+    photos.forEach((dataUrl, idx) => {
+      const x = M + idx * (photoW + photoGap);
+      try{
+        doc.setDrawColor(215); doc.setLineWidth(0.75);
+        doc.rect(x, y, photoW, photoH);
+        doc.addImage(dataUrl, 'JPEG', x, y, photoW, photoH);
+      }catch(e){ console.error('Fotoğraf PDF\'e eklenemedi:', e); }
+    });
+    y += photoH + 20;
+  }
+
   // --- footer ---
   doc.setDrawColor(228); doc.setLineWidth(0.75);
   doc.line(M, PAGE_H - BORDER - 34, PAGE_W - M, PAGE_H - BORDER - 34);
@@ -1344,6 +1713,7 @@ function openEditScreen(id){
   document.getElementById('e_sig_existing').style.display = 'grid';
   document.getElementById('e_sig_new').style.display = 'none';
   if (editPadsReady){ padTeknisyenE.clear(); padMusteriE.clear(); }
+  setPhotos('e', r.fotograflar || []);
   showToast('editToast','','');
 
   document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
@@ -1424,7 +1794,8 @@ document.getElementById('saveEditBtn').addEventListener('click', async ()=>{
       malzeme: document.getElementById('e_malzeme').value.trim(),
       yetkili: document.getElementById('e_yetkili').value.trim(),
       sigTeknisyen: sigTeknisyen,
-      sigMusteri: sigMusteri
+      sigMusteri: sigMusteri,
+      fotograflar: photoState.e.slice()
     });
 
     saveBtn.disabled = true; saveBtn.textContent = 'Kaydediliyor…';
@@ -1519,9 +1890,11 @@ async function refreshAll(){
     console.error(e);
   }
   document.getElementById('openCount').textContent = allRecords.filter(r=>r.status==='open').length;
+  refreshAutocompleteLists();
   const activeSection = document.querySelector('.shell section.active');
   if (activeSection && activeSection.id === 'tab-open') renderOpen();
   if (activeSection && activeSection.id === 'tab-list') renderHistory();
+  if (activeSection && activeSection.id === 'tab-stats') renderStats();
 }
 
 function startupCheck(){
@@ -1543,6 +1916,23 @@ function startupCheck(){
 setTimeout(startupCheck, 2500);
 
 refreshAll();
+prefillRememberedTeknisyen();
+
+// PWA: service worker'ı kaydet (offline kabuk + hızlı açılış için).
+if ('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(err=>{
+      console.warn('Service worker kaydedilemedi:', err);
+    });
+  });
+}
+
+// Açık servislerin "kaç saattir açık" etiketi zamana bağlı olduğundan,
+// o sekme görünürken dakikada bir tazelenir.
+setInterval(()=>{
+  const activeSection = document.querySelector('.shell section.active');
+  if (activeSection && activeSection.id === 'tab-open') renderOpen();
+}, 60000);
 </script>
 </body>
 </html>
