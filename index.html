@@ -14,7 +14,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/signature_pad/4.1.7/signature_pad.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
@@ -750,50 +749,36 @@ const FIREBASE_CONFIG = {
   appId: "1:842287609737:web:931d09d93c71f76533d358"
 };
 
-/* E-posta bildirimleri için EmailJS (tarayıcı taraflı, sunucu gerektirmez).
-   Aşağıdaki üç değeri kendi EmailJS hesabınızdan alıp doldurun — kurulum
-   adımları sohbette ayrıca anlatıldı. Doldurulmadığı sürece uygulama
-   normal çalışmaya devam eder, sadece mail gönderilmez. */
-const EMAILJS_CONFIG = {
-  publicKey: "rZctDn_G2uLXz1YlV",
-  serviceId: "service_efhpo8n",
-  templateStartId: "template_ll49sgp",
-  templateFinishId: "template_fbwux4r"
-};
-let emailjsReady = false;
-function initEmailJs(){
-  try{
-    if (EMAILJS_CONFIG.publicKey === 'YOUR_EMAILJS_PUBLIC_KEY'){
-      throw new Error('EmailJS yapılandırması eksik — EMAILJS_CONFIG değerlerini doldurun.');
-    }
-    if (typeof emailjs === 'undefined'){
-      throw new Error('EmailJS kütüphanesi yüklenemedi.');
-    }
-    emailjs.init({ publicKey: EMAILJS_CONFIG.publicKey });
-    emailjsReady = true;
-  }catch(err){
-    console.warn('E-posta bildirimleri devre dışı:', err.message);
-    emailjsReady = false;
-  }
-}
-initEmailJs();
+/* E-posta bildirimleri — güvenli bir Cloudflare Worker üzerinden Resend
+   API'sine gönderiliyor. Gizli anahtar (Resend API key) tarayıcı tarafında
+   hiç bulunmuyor, sadece Worker'ın kendi ortam değişkeninde saklı. */
+const MAIL_WORKER_URL = "https://umvion-mail-proxy.serdox.workers.dev";
 
 async function sendServiceEmail(kind, rec){
-  if (!emailjsReady) return;
   if (!rec.markaEmail) return;
-  const templateId = kind === 'start' ? EMAILJS_CONFIG.templateStartId : EMAILJS_CONFIG.templateFinishId;
-  const params = {
-    to_email: rec.markaEmail,
-    marka: rec.marka || '',
-    magaza: rec.musteri || '',
-    teknisyen: rec.teknisyen || '',
-    tarih: formatDate(kind === 'start' ? rec.girisTarihi : rec.cikisTarihi),
-    saat: kind === 'start' ? rec.girisSaati : rec.cikisSaati,
-    iletisim_kisi: rec.markaIletisimKisi || '',
-    durum: kind === 'start' ? 'başladı' : 'tamamlandı'
-  };
   try{
-    await emailjs.send(EMAILJS_CONFIG.serviceId, templateId, params);
+    const durum = kind === 'start' ? 'başladı' : 'tamamlandı';
+    const tarih = formatDate(kind === 'start' ? rec.girisTarihi : rec.cikisTarihi);
+    const saat = kind === 'start' ? rec.girisSaati : rec.cikisSaati;
+    const subject = (kind === 'start' ? 'Servis Başladı - ' : 'Servis Tamamlandı - ') +
+      (rec.marka || '') + ' ' + (rec.musteri || '');
+    const html = `
+      <div style="font-family:Arial,sans-serif;font-size:15px;color:#13202b;line-height:1.5;">
+        <p>Merhaba ${escapeHtml(rec.markaIletisimKisi || '')},</p>
+        <p><b>${escapeHtml(rec.teknisyen || '')}</b> teknisyenimiz <b>${escapeHtml(rec.marka || '')}</b>
+           markanız <b>${escapeHtml(rec.musteri || '')}</b> mağazanızda işleme <b>${durum}</b>.</p>
+        <p>Tarih: ${tarih}<br>Saat: ${saat}</p>
+        <p>Bilgilerinize sunarız.<br>Umvion Teknoloji</p>
+      </div>`;
+
+    const res = await fetch(MAIL_WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: rec.markaEmail, subject, html })
+    });
+    if (!res.ok){
+      console.error('Bildirim e-postası gönderilemedi:', res.status, await res.text());
+    }
   }catch(err){
     console.error('Bildirim e-postası gönderilemedi:', err);
   }
