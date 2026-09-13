@@ -14,6 +14,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/signature_pad/4.1.7/signature_pad.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
@@ -235,6 +236,7 @@
     <button data-tab="open">Açık Servisler <span class="count" id="openCount">0</span></button>
     <button data-tab="list">Geçmiş Kayıtlar</button>
     <button data-tab="stats">İstatistikler</button>
+    <button data-tab="admin">Yönetici Paneli</button>
   </nav>
 </header>
 
@@ -259,23 +261,30 @@
         <legend>ÖN BİLGİLER</legend>
         <div class="row2">
           <div class="field">
-            <label for="s_teknisyen">Servisi veren teknisyen</label>
-            <input type="text" id="s_teknisyen" placeholder="Örn. Ahmet Yılmaz" list="teknisyenList" required>
+            <label for="s_marka">Marka</label>
+            <select id="s_marka" required>
+              <option value="">Marka seçin…</option>
+            </select>
+            <div class="hint">Listede yoksa Yönetici Paneli'nden ekleyin. Servis başlatıldığında/tamamlandığında bu markanın kayıtlı e-postasına otomatik bilgilendirme gider.</div>
           </div>
           <div class="field">
-            <label for="s_musteri">Müşteri / mağaza adı</label>
-            <input type="text" id="s_musteri" placeholder="Örn. Nova Elektronik - Kadıköy" list="musteriList" required>
+            <label for="s_musteri">Mağaza / şube adı</label>
+            <input type="text" id="s_musteri" placeholder="Örn. Kadıköy Şubesi" list="musteriList" required>
           </div>
         </div>
         <div class="row2">
           <div class="field">
+            <label for="s_teknisyen">Servisi veren teknisyen</label>
+            <input type="text" id="s_teknisyen" placeholder="Örn. Ahmet Yılmaz" list="teknisyenList" required>
+          </div>
+          <div class="field">
             <label for="s_telefon">Telefon</label>
             <input type="tel" id="s_telefon" placeholder="05xx xxx xx xx">
           </div>
-          <div class="field">
-            <label for="s_adres">Adres</label>
-            <input type="text" id="s_adres" placeholder="Servis yapılan adres">
-          </div>
+        </div>
+        <div class="field">
+          <label for="s_adres">Adres</label>
+          <input type="text" id="s_adres" placeholder="Servis yapılan adres">
         </div>
         <div class="field">
           <label for="s_ariza">Servis nedeni ve açıklaması</label>
@@ -588,6 +597,106 @@
     <div id="statsWrap"></div>
   </section>
 
+  <!-- ============ ADMIN PANEL ============ -->
+  <section id="tab-admin">
+
+    <div id="adminLoginView">
+      <div id="adminLoginToast" class="toast"></div>
+      <fieldset>
+        <legend>YÖNETİCİ GİRİŞİ</legend>
+        <div class="row2">
+          <div class="field">
+            <label for="admin_username">Kullanıcı adı</label>
+            <input type="text" id="admin_username" value="Admin">
+          </div>
+          <div class="field">
+            <label for="admin_password">Şifre</label>
+            <input type="password" id="admin_password" placeholder="••••••">
+          </div>
+        </div>
+      </fieldset>
+      <div class="submit-row" style="justify-content:space-between;">
+        <button type="button" class="ghost" id="showForgotBtn">Şifremi unuttum</button>
+        <button type="button" class="primary" id="adminLoginBtn">Giriş yap</button>
+      </div>
+
+      <div id="forgotWrap" style="display:none;margin-top:24px;">
+        <fieldset>
+          <legend>ŞİFRE SIFIRLAMA (ana kurtarma kodu ile)</legend>
+          <div class="row2">
+            <div class="field">
+              <label for="admin_master_code">Kurtarma kodu</label>
+              <input type="password" id="admin_master_code" placeholder="Ana kurtarma kodu">
+            </div>
+            <div class="field">
+              <label for="admin_new_password_forgot">Yeni şifre</label>
+              <input type="password" id="admin_new_password_forgot" placeholder="Yeni şifre">
+            </div>
+          </div>
+        </fieldset>
+        <div class="submit-row">
+          <button type="button" class="ghost" id="cancelForgotBtn">Vazgeç</button>
+          <button type="button" class="primary" id="resetPasswordBtn">Şifreyi sıfırla</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="adminPanelView" style="display:none;">
+      <div id="adminToast" class="toast"></div>
+      <div class="submit-row" style="justify-content:flex-end;margin-bottom:22px;">
+        <button type="button" class="ghost" id="adminLogoutBtn">Çıkış yap</button>
+      </div>
+
+      <fieldset>
+        <legend>ŞİFRE DEĞİŞTİR</legend>
+        <div class="row2">
+          <div class="field">
+            <label for="admin_cur_password">Mevcut şifre</label>
+            <input type="password" id="admin_cur_password">
+          </div>
+          <div class="field">
+            <label for="admin_new_password">Yeni şifre</label>
+            <input type="password" id="admin_new_password">
+          </div>
+        </div>
+        <div class="submit-row">
+          <button type="button" class="ghost" id="changePasswordBtn">Şifreyi güncelle</button>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>YENİ MARKA EKLE</legend>
+        <div class="row2">
+          <div class="field">
+            <label for="b_marka_adi">Marka adı</label>
+            <input type="text" id="b_marka_adi" placeholder="Örn. Nova Elektronik">
+          </div>
+          <div class="field">
+            <label for="b_iletisim_kisi">İletişimde olunan kişi</label>
+            <input type="text" id="b_iletisim_kisi" placeholder="Örn. Ayşe Yıldız">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="b_telefon">Telefon</label>
+            <input type="tel" id="b_telefon" placeholder="05xx xxx xx xx">
+          </div>
+          <div class="field">
+            <label for="b_email">E-posta (bildirimler buraya gider)</label>
+            <input type="email" id="b_email" placeholder="ornek@marka.com">
+          </div>
+        </div>
+        <div class="submit-row">
+          <button type="button" class="ghost" id="clearBrandFormBtn">Formu temizle</button>
+          <button type="button" class="primary" id="saveBrandBtn">Markayı kaydet</button>
+        </div>
+      </fieldset>
+
+      <div class="stat-table-title sans">KAYITLI MARKALAR</div>
+      <div id="brandsWrap"></div>
+    </div>
+  </section>
+
 </div>
 
 <datalist id="musteriList"></datalist>
@@ -641,11 +750,70 @@ const FIREBASE_CONFIG = {
   appId: "1:842287609737:web:931d09d93c71f76533d358"
 };
 
+/* E-posta bildirimleri için EmailJS (tarayıcı taraflı, sunucu gerektirmez).
+   Aşağıdaki üç değeri kendi EmailJS hesabınızdan alıp doldurun — kurulum
+   adımları sohbette ayrıca anlatıldı. Doldurulmadığı sürece uygulama
+   normal çalışmaya devam eder, sadece mail gönderilmez. */
+const EMAILJS_CONFIG = {
+  publicKey: "rZctDn_G2uLXz1YlV",
+  serviceId: "service_qjkr14k",
+  templateStartId: "template_ll49sgp",
+  templateFinishId: "template_fbwux4r"
+};
+let emailjsReady = false;
+function initEmailJs(){
+  try{
+    if (EMAILJS_CONFIG.publicKey === 'YOUR_EMAILJS_PUBLIC_KEY'){
+      throw new Error('EmailJS yapılandırması eksik — EMAILJS_CONFIG değerlerini doldurun.');
+    }
+    if (typeof emailjs === 'undefined'){
+      throw new Error('EmailJS kütüphanesi yüklenemedi.');
+    }
+    emailjs.init({ publicKey: EMAILJS_CONFIG.publicKey });
+    emailjsReady = true;
+  }catch(err){
+    console.warn('E-posta bildirimleri devre dışı:', err.message);
+    emailjsReady = false;
+  }
+}
+initEmailJs();
+
+async function sendServiceEmail(kind, rec){
+  if (!emailjsReady) return;
+  if (!rec.markaEmail) return;
+  const templateId = kind === 'start' ? EMAILJS_CONFIG.templateStartId : EMAILJS_CONFIG.templateFinishId;
+  const params = {
+    to_email: rec.markaEmail,
+    marka: rec.marka || '',
+    magaza: rec.musteri || '',
+    teknisyen: rec.teknisyen || '',
+    tarih: formatDate(kind === 'start' ? rec.girisTarihi : rec.cikisTarihi),
+    saat: kind === 'start' ? rec.girisSaati : rec.cikisSaati,
+    iletisim_kisi: rec.markaIletisimKisi || '',
+    durum: kind === 'start' ? 'başladı' : 'tamamlandı'
+  };
+  try{
+    await emailjs.send(EMAILJS_CONFIG.serviceId, templateId, params);
+  }catch(err){
+    console.error('Bildirim e-postası gönderilemedi:', err);
+  }
+}
+
 const COLLECTION_NAME = 'umvionServisFormlari';
+const BRANDS_COLLECTION = 'umvionMarkalar';
+const ADMIN_DOC_PATH = 'umvionAyarlar/admin';
+const MASTER_RESET_CODE = '07192244';
 let firebaseReady = false;
 let db = null;
 let allRecords = [];
+let allBrands = [];
 let currentEditingId = null;
+
+async function sha256Hex(text){
+  const enc = new TextEncoder().encode(text);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
 
 function initFirebase(){
   try{
@@ -659,6 +827,8 @@ function initFirebase(){
     db = firebase.firestore();
     firebaseReady = true;
     startRealtimeSync();
+    startBrandsSync();
+    ensureAdminSeed();
   }catch(err){
     console.error(err);
     firebaseReady = false;
@@ -682,6 +852,51 @@ function startRealtimeSync(){
     },
     (err) => { console.error('Canlı senkronizasyon hatası:', err); }
   );
+}
+
+function startBrandsSync(){
+  db.collection(BRANDS_COLLECTION).onSnapshot(
+    (snapshot) => {
+      allBrands = snapshot.docs.map(d => d.data()).sort((a,b)=> (a.markaAdi||'').localeCompare(b.markaAdi||''));
+      refreshBrandOptions();
+      const activeSection = document.querySelector('.shell section.active');
+      if (activeSection && activeSection.id === 'tab-admin') renderBrandsTable();
+    },
+    (err) => { console.error('Marka senkronizasyon hatası:', err); }
+  );
+}
+
+async function saveBrand(brand){
+  if (!firebaseReady) throw new Error('Bulut veritabanı yapılandırılmamış.');
+  await db.collection(BRANDS_COLLECTION).doc(brand.id).set(brand);
+  return { key: brand.id };
+}
+async function deleteBrand(id){
+  if (!firebaseReady) throw new Error('Bulut veritabanı yapılandırılmamış.');
+  await db.collection(BRANDS_COLLECTION).doc(id).delete();
+  return { deleted: true };
+}
+
+/* Admin şifresi Firestore'da hash olarak tutulur (düz metin değil).
+   İlk çalıştırmada hiç kayıt yoksa varsayılan "Admin" şifresiyle oluşturulur. */
+async function ensureAdminSeed(){
+  try{
+    const ref = db.doc(ADMIN_DOC_PATH);
+    const snap = await ref.get();
+    if (!snap.exists){
+      const hash = await sha256Hex('Admin');
+      await ref.set({ passwordHash: hash });
+    }
+  }catch(err){
+    console.error('Admin ayarları başlatılamadı:', err);
+  }
+}
+async function getAdminPasswordHash(){
+  const snap = await db.doc(ADMIN_DOC_PATH).get();
+  return snap.exists ? snap.data().passwordHash : null;
+}
+async function setAdminPasswordHash(newHash){
+  await db.doc(ADMIN_DOC_PATH).set({ passwordHash: newHash });
 }
 
 async function saveRecord(rec){
@@ -724,6 +939,7 @@ function activateTab(name){
   if (name === 'list') renderHistory();
   if (name === 'open') renderOpen();
   if (name === 'stats') renderStats();
+  if (name === 'admin') showAdminView();
 }
 document.querySelectorAll('nav.tabs button').forEach(btn=>{
   btn.addEventListener('click', ()=> activateTab(btn.dataset.tab));
@@ -1014,6 +1230,7 @@ function clearStartForm(){
    'm_islem','m_malzeme','m_yetkili'].forEach(id=>{
     document.getElementById(id).value = '';
   });
+  document.getElementById('s_marka').value = '';
   if (manualPadsReady){ padTeknisyenM.clear(); padMusteriM.clear(); }
   resetPhotos('m');
 }
@@ -1033,6 +1250,8 @@ document.getElementById('startBtn').addEventListener('click', async ()=>{
     const teknisyen = document.getElementById('s_teknisyen').value.trim();
     const musteri = document.getElementById('s_musteri').value.trim();
     const ariza = document.getElementById('s_ariza').value.trim();
+    const markaId = document.getElementById('s_marka').value;
+    const brand = allBrands.find(b => b.id === markaId);
 
     if (!teknisyen || !musteri || !ariza){
       showToast('newToast','err','Teknisyen, müşteri/mağaza adı ve servis nedeni alanlarını doldurun.');
@@ -1044,11 +1263,18 @@ document.getElementById('startBtn').addEventListener('click', async ()=>{
     }
 
     if (startMode === 'live'){
+      if (!markaId || !brand){
+        showToast('newToast','err','Lütfen bir marka seçin. Listede yoksa Yönetici Paneli\'nden ekleyin.');
+        return;
+      }
       const np = nowParts();
       const rec = {
         id: 'sv_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
         status: 'open',
         kayitTuru: 'otomatik',
+        marka: brand.markaAdi,
+        markaEmail: brand.email,
+        markaIletisimKisi: brand.iletisimKisi || '',
         teknisyen: teknisyen,
         musteri: musteri,
         telefon: document.getElementById('s_telefon').value.trim(),
@@ -1067,6 +1293,7 @@ document.getElementById('startBtn').addEventListener('click', async ()=>{
       const res = await withTimeout(saveRecord(rec), 15000, 'Kayıt');
       if (!res) throw new Error('depolama yanıtı boş');
 
+      sendServiceEmail('start', rec);
       rememberTeknisyen(teknisyen);
       clearStartForm();
       showToast('newToast','ok',`Servis başlatıldı — giriş ${np.saat}. "Açık Servisler" sekmesinden devam edebilirsiniz.`);
@@ -1298,6 +1525,7 @@ document.getElementById('finishBtn').addEventListener('click', async ()=>{
     const res = await withTimeout(saveRecord(r), 15000, 'Kayıt');
     if (!res) throw new Error('depolama yanıtı boş');
 
+    sendServiceEmail('finish', r);
     await refreshAll();
     currentEditingId = null;
     activateTab('list');
@@ -1916,6 +2144,211 @@ function startupCheck(){
     console.warn('Yüklenemeyen bileşenler (servis tamamlama / PDF adımlarını etkiler):', otherProblems.join(', '));
   }
 }
+/* ============================================================
+   ADMIN PANEL — login (session-only), password change/reset,
+   and brand (marka) management with email notification routing.
+   ============================================================ */
+function showAdminView(){
+  const loggedIn = sessionStorage.getItem('umvion_admin_session') === 'true';
+  document.getElementById('adminLoginView').style.display = loggedIn ? 'none' : 'block';
+  document.getElementById('adminPanelView').style.display = loggedIn ? 'block' : 'none';
+  document.getElementById('forgotWrap').style.display = 'none';
+  showToast('adminLoginToast','','');
+  showToast('adminToast','','');
+  document.getElementById('admin_password').value = '';
+  if (loggedIn) renderBrandsTable();
+}
+
+document.getElementById('showForgotBtn').addEventListener('click', ()=>{
+  document.getElementById('forgotWrap').style.display = 'block';
+});
+document.getElementById('cancelForgotBtn').addEventListener('click', ()=>{
+  document.getElementById('forgotWrap').style.display = 'none';
+  document.getElementById('admin_master_code').value = '';
+  document.getElementById('admin_new_password_forgot').value = '';
+});
+
+document.getElementById('adminLoginBtn').addEventListener('click', async ()=>{
+  showToast('adminLoginToast','','');
+  try{
+    if (!firebaseReady){
+      showToast('adminLoginToast','err','Bulut veritabanına bağlanılamıyor.');
+      return;
+    }
+    const username = document.getElementById('admin_username').value.trim();
+    const password = document.getElementById('admin_password').value;
+    if (username !== 'Admin'){
+      showToast('adminLoginToast','err','Kullanıcı adı hatalı.');
+      return;
+    }
+    const enteredHash = await sha256Hex(password);
+    const storedHash = await getAdminPasswordHash();
+    if (!storedHash || enteredHash !== storedHash){
+      showToast('adminLoginToast','err','Şifre hatalı.');
+      return;
+    }
+    sessionStorage.setItem('umvion_admin_session', 'true');
+    showAdminView();
+  }catch(err){
+    console.error(err);
+    showToast('adminLoginToast','err','Giriş yapılamadı: ' + (err && err.message ? err.message : 'bilinmeyen hata'));
+  }
+});
+
+document.getElementById('resetPasswordBtn').addEventListener('click', async ()=>{
+  showToast('adminLoginToast','','');
+  try{
+    const code = document.getElementById('admin_master_code').value;
+    const newPass = document.getElementById('admin_new_password_forgot').value;
+    if (code !== MASTER_RESET_CODE){
+      showToast('adminLoginToast','err','Kurtarma kodu hatalı.');
+      return;
+    }
+    if (!newPass || newPass.length < 4){
+      showToast('adminLoginToast','err','Yeni şifre en az 4 karakter olmalı.');
+      return;
+    }
+    const newHash = await sha256Hex(newPass);
+    await setAdminPasswordHash(newHash);
+    document.getElementById('admin_master_code').value = '';
+    document.getElementById('admin_new_password_forgot').value = '';
+    document.getElementById('forgotWrap').style.display = 'none';
+    showToast('adminLoginToast','ok','Şifre sıfırlandı. Yeni şifrenizle giriş yapabilirsiniz.');
+  }catch(err){
+    console.error(err);
+    showToast('adminLoginToast','err','Sıfırlanamadı: ' + (err && err.message ? err.message : 'bilinmeyen hata'));
+  }
+});
+
+document.getElementById('adminLogoutBtn').addEventListener('click', ()=>{
+  sessionStorage.removeItem('umvion_admin_session');
+  showAdminView();
+});
+
+document.getElementById('changePasswordBtn').addEventListener('click', async ()=>{
+  showToast('adminToast','','');
+  try{
+    const cur = document.getElementById('admin_cur_password').value;
+    const next = document.getElementById('admin_new_password').value;
+    if (!next || next.length < 4){
+      showToast('adminToast','err','Yeni şifre en az 4 karakter olmalı.');
+      return;
+    }
+    const curHash = await sha256Hex(cur);
+    const storedHash = await getAdminPasswordHash();
+    if (curHash !== storedHash){
+      showToast('adminToast','err','Mevcut şifre hatalı.');
+      return;
+    }
+    const newHash = await sha256Hex(next);
+    await setAdminPasswordHash(newHash);
+    document.getElementById('admin_cur_password').value = '';
+    document.getElementById('admin_new_password').value = '';
+    showToast('adminToast','ok','Şifre güncellendi.');
+  }catch(err){
+    console.error(err);
+    showToast('adminToast','err','Güncellenemedi: ' + (err && err.message ? err.message : 'bilinmeyen hata'));
+  }
+});
+
+function clearBrandForm(){
+  ['b_marka_adi','b_iletisim_kisi','b_telefon','b_email'].forEach(id=>{
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('saveBrandBtn').dataset.editId = '';
+  document.getElementById('saveBrandBtn').textContent = 'Markayı kaydet';
+}
+document.getElementById('clearBrandFormBtn').addEventListener('click', clearBrandForm);
+
+document.getElementById('saveBrandBtn').addEventListener('click', async ()=>{
+  showToast('adminToast','','');
+  try{
+    const markaAdi = document.getElementById('b_marka_adi').value.trim();
+    const email = document.getElementById('b_email').value.trim();
+    if (!markaAdi || !email){
+      showToast('adminToast','err','Marka adı ve e-posta zorunludur.');
+      return;
+    }
+    const btn = document.getElementById('saveBrandBtn');
+    const editId = btn.dataset.editId;
+    const brand = {
+      id: editId || ('brand_' + Date.now() + '_' + Math.random().toString(36).slice(2,8)),
+      markaAdi: markaAdi,
+      iletisimKisi: document.getElementById('b_iletisim_kisi').value.trim(),
+      telefon: document.getElementById('b_telefon').value.trim(),
+      email: email
+    };
+    await withTimeout(saveBrand(brand), 15000, 'Marka kaydı');
+    clearBrandForm();
+    showToast('adminToast','ok', editId ? 'Marka güncellendi.' : 'Marka eklendi.');
+  }catch(err){
+    console.error(err);
+    showToast('adminToast','err','Kaydedilemedi: ' + (err && err.message ? err.message : 'bilinmeyen hata'));
+  }
+});
+
+function renderBrandsTable(){
+  const wrap = document.getElementById('brandsWrap');
+  if (!wrap) return;
+  if (!allBrands.length){
+    wrap.innerHTML = `<div class="empty"><div class="big">Henüz marka yok</div><div>Yukarıdaki formla ilk markanızı ekleyin.</div></div>`;
+    return;
+  }
+  const rows = allBrands.map(b => `
+    <tr data-id="${b.id}">
+      <td class="sans cust">${escapeHtml(b.markaAdi)}</td>
+      <td class="sans">${escapeHtml(b.iletisimKisi||'—')}</td>
+      <td class="sans">${escapeHtml(b.telefon||'—')}</td>
+      <td class="sans">${escapeHtml(b.email)}</td>
+      <td>
+        <div class="actions">
+          <button data-act="editbrand" data-id="${b.id}">Düzenle</button>
+          <button data-act="delbrand" data-id="${b.id}" class="danger">Sil</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+  wrap.innerHTML = `
+    <table class="recs">
+      <thead><tr><th>Marka</th><th>İletişim Kişisi</th><th>Telefon</th><th>E-posta</th><th>İşlemler</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+  wrap.querySelectorAll('button[data-act="editbrand"]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const b = allBrands.find(x=>x.id===btn.dataset.id);
+      if (!b) return;
+      document.getElementById('b_marka_adi').value = b.markaAdi || '';
+      document.getElementById('b_iletisim_kisi').value = b.iletisimKisi || '';
+      document.getElementById('b_telefon').value = b.telefon || '';
+      document.getElementById('b_email').value = b.email || '';
+      document.getElementById('saveBrandBtn').dataset.editId = b.id;
+      document.getElementById('saveBrandBtn').textContent = 'Değişiklikleri kaydet';
+    });
+  });
+  wrap.querySelectorAll('button[data-act="delbrand"]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if (!confirm('Bu markayı silmek istediğinize emin misiniz?')) return;
+      try{
+        await withTimeout(deleteBrand(btn.dataset.id), 15000, 'Marka silme');
+        showToast('adminToast','ok','Marka silindi.');
+      }catch(err){
+        console.error(err);
+        showToast('adminToast','err','Silinemedi: ' + (err && err.message ? err.message : 'bilinmeyen hata'));
+      }
+    });
+  });
+}
+
+function refreshBrandOptions(){
+  const sel = document.getElementById('s_marka');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Marka seçin…</option>' +
+    allBrands.map(b => `<option value="${b.id}">${escapeHtml(b.markaAdi)}</option>`).join('');
+  if (current && allBrands.some(b=>b.id===current)) sel.value = current;
+}
+
 setTimeout(startupCheck, 2500);
 
 refreshAll();
