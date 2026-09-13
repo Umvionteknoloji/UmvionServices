@@ -768,13 +768,31 @@ async function sendServiceEmail(kind, rec){
         <p><b>${escapeHtml(rec.teknisyen || '')}</b> teknisyenimiz, <b>${escapeHtml(rec.marka || '')}</b> markanıza ait
            <b>${escapeHtml(rec.musteri || '')}</b> lokasyonunda <b>${durumCumlesi}</b>.</p>
         <p>Tarih: ${tarih}<br>Saat: ${saat}</p>
+        ${kind === 'finish' ? '<p>Tamamlanan servis formunu ekte PDF olarak bulabilirsiniz.</p>' : ''}
         <p>Bilgilerinize sunarız.<br>Umvion Teknoloji</p>
       </div>`;
+
+    const payload = { to: rec.markaEmail, subject, html };
+
+    // İşi bitiren mailde, o an oluşturulan servis formu PDF olarak eklenir.
+    if (kind === 'finish'){
+      try{
+        const pdfDoc = buildPdf(rec);
+        const dataUri = pdfDoc.output('datauristring');
+        const base64Pdf = dataUri.split(',')[1];
+        payload.attachments = [{
+          filename: `servis-${rec.girisTarihi}-${slug(rec.musteri)}.pdf`,
+          content: base64Pdf
+        }];
+      }catch(pdfErr){
+        console.error('PDF eki hazırlanamadı, mail PDF olmadan gönderiliyor:', pdfErr);
+      }
+    }
 
     const res = await fetch(MAIL_WORKER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: rec.markaEmail, subject, html })
+      body: JSON.stringify(payload)
     });
     if (!res.ok){
       console.error('Bildirim e-postası gönderilemedi:', res.status, await res.text());
