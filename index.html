@@ -765,8 +765,8 @@ async function sendServiceEmail(kind, rec){
     const html = `
       <div style="font-family:Arial,sans-serif;font-size:15px;color:#13202b;line-height:1.5;">
         <p>Merhaba ${escapeHtml(rec.markaIletisimKisi || '')},</p>
-        <p><b>${escapeHtml(rec.teknisyen || '')}</b> teknisyenimiz <b>${escapeHtml(rec.marka || '')}</b>
-           markanız <b>${escapeHtml(rec.musteri || '')}</b> mağazanızda işleme <b>${durum}</b>.</p>
+        <p><b>${escapeHtml(rec.teknisyen || '')}</b> teknisyenimiz, <b>${escapeHtml(rec.marka || '')}</b> markanıza ait
+           <b>${escapeHtml(rec.musteri || '')}</b> lokasyonunda gerçekleştirdiği servisi <b>${durum}</b>.</p>
         <p>Tarih: ${tarih}<br>Saat: ${saat}</p>
         <p>Bilgilerinize sunarız.<br>Umvion Teknoloji</p>
       </div>`;
