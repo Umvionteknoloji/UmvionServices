@@ -447,6 +447,7 @@
   <section id="tab-edit">
     <button class="back-link" id="backToListFromEdit">&larr; Geçmiş kayıtlara dön</button>
     <div id="editToast" class="toast"></div>
+    <div class="stamp-row"><div class="dot"></div><div class="txt">Belge no: <b id="e_belge_no">—</b></div></div>
 
     <div id="editForm">
       <fieldset>
@@ -671,19 +672,24 @@
             <input type="text" id="b_marka_adi" placeholder="Örn. Nova Elektronik">
           </div>
           <div class="field">
-            <label for="b_iletisim_kisi">İletişimde olunan kişi</label>
-            <input type="text" id="b_iletisim_kisi" placeholder="Örn. Ayşe Yıldız">
+            <label for="b_kisaltma">Kısaltma (belge no için, 3 harf)</label>
+            <input type="text" id="b_kisaltma" placeholder="Örn. NVE" maxlength="6" style="text-transform:uppercase;">
+            <div class="hint">Belge numaralarında kullanılır: UMV + kısaltma + sıra no (örn. UMVNVE00001).</div>
           </div>
         </div>
         <div class="row2">
           <div class="field">
+            <label for="b_iletisim_kisi">İletişimde olunan kişi</label>
+            <input type="text" id="b_iletisim_kisi" placeholder="Örn. Ayşe Yıldız">
+          </div>
+          <div class="field">
             <label for="b_telefon">Telefon</label>
             <input type="tel" id="b_telefon" placeholder="05xx xxx xx xx">
           </div>
-          <div class="field">
-            <label for="b_email">E-posta (bildirimler buraya gider)</label>
-            <input type="email" id="b_email" placeholder="ornek@marka.com">
-          </div>
+        </div>
+        <div class="field">
+          <label for="b_email">E-posta (bildirimler buraya gider)</label>
+          <input type="email" id="b_email" placeholder="ornek@marka.com">
         </div>
         <div class="submit-row">
           <button type="button" class="ghost" id="clearBrandFormBtn">Formu temizle</button>
@@ -781,7 +787,7 @@ async function sendServiceEmail(kind, rec){
         const dataUri = pdfDoc.output('datauristring');
         const base64Pdf = dataUri.split(',')[1];
         payload.attachments = [{
-          filename: `servis-${rec.girisTarihi}-${slug(rec.musteri)}.pdf`,
+          filename: `${rec.belgeNo || ('servis-' + rec.girisTarihi)}-${slug(rec.musteri)}.pdf`,
           content: base64Pdf
         }];
       }catch(pdfErr){
@@ -871,8 +877,23 @@ function startBrandsSync(){
 
 async function saveBrand(brand){
   if (!firebaseReady) throw new Error('Bulut veritabanı yapılandırılmamış.');
-  await db.collection(BRANDS_COLLECTION).doc(brand.id).set(brand);
+  // merge:true — kısaltma/iletişim gibi alanları düzenlerken belge sayacını
+  // (sayac) yanlışlıkla silmemek için.
+  await db.collection(BRANDS_COLLECTION).doc(brand.id).set(brand, { merge: true });
   return { key: brand.id };
+}
+async function getNextBelgeNo(brandId, kisaltma){
+  if (!firebaseReady) throw new Error('Bulut veritabanı yapılandırılmamış.');
+  const brandRef = db.collection(BRANDS_COLLECTION).doc(brandId);
+  const nextCount = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(brandRef);
+    const current = (snap.exists && snap.data().sayac) ? snap.data().sayac : 0;
+    const next = current + 1;
+    tx.set(brandRef, { sayac: next }, { merge: true });
+    return next;
+  });
+  const kis = (kisaltma || 'MRK').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6) || 'MRK';
+  return 'UMV' + kis + String(nextCount).padStart(5, '0');
 }
 async function deleteBrand(id){
   if (!firebaseReady) throw new Error('Bulut veritabanı yapılandırılmamış.');
@@ -1271,8 +1292,11 @@ document.getElementById('startBtn').addEventListener('click', async ()=>{
         return;
       }
       const np = nowParts();
+      startBtn.disabled = true; startBtn.textContent = busyLabel;
+      const belgeNo = await getNextBelgeNo(brand.id, brand.kisaltma);
       const rec = {
         id: 'sv_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
+        belgeNo: belgeNo,
         status: 'open',
         kayitTuru: 'otomatik',
         marka: brand.markaAdi,
@@ -1292,19 +1316,22 @@ document.getElementById('startBtn').addEventListener('click', async ()=>{
         fotograflar: []
       };
 
-      startBtn.disabled = true; startBtn.textContent = busyLabel;
       const res = await withTimeout(saveRecord(rec), 15000, 'Kayıt');
       if (!res) throw new Error('depolama yanıtı boş');
 
       sendServiceEmail('start', rec);
       rememberTeknisyen(teknisyen);
       clearStartForm();
-      showToast('newToast','ok',`Servis başlatıldı — giriş ${np.saat}. "Açık Servisler" sekmesinden devam edebilirsiniz.`);
+      showToast('newToast','ok',`Servis başlatıldı — giriş ${np.saat}. Belge no: ${belgeNo}. "Açık Servisler" sekmesinden devam edebilirsiniz.`);
       await refreshAll();
       activateTab('open');
     } else {
       // Manuel / geçmişe dönük kayıt: tüm alanlar elle girilir, kayıt
       // doğrudan tamamlanmış olarak oluşturulur.
+      if (!markaId || !brand){
+        showToast('newToast','err','Lütfen bir marka seçin. Listede yoksa Yönetici Paneli\'nden ekleyin.');
+        return;
+      }
       const girisTarihi = document.getElementById('m_giris_tarihi').value;
       const girisSaati = document.getElementById('m_giris_saati').value;
       const cikisTarihi = document.getElementById('m_cikis_tarihi').value;
@@ -1328,10 +1355,16 @@ document.getElementById('startBtn').addEventListener('click', async ()=>{
         return;
       }
 
+      startBtn.disabled = true; startBtn.textContent = busyLabel;
+      const belgeNo = await getNextBelgeNo(brand.id, brand.kisaltma);
       const rec = {
         id: 'sv_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
+        belgeNo: belgeNo,
         status: 'completed',
         kayitTuru: 'manuel',
+        marka: brand.markaAdi,
+        markaEmail: brand.email,
+        markaIletisimKisi: brand.iletisimKisi || '',
         teknisyen: teknisyen,
         musteri: musteri,
         telefon: document.getElementById('s_telefon').value.trim(),
@@ -1351,13 +1384,12 @@ document.getElementById('startBtn').addEventListener('click', async ()=>{
         fotograflar: photoState.m.slice()
       };
 
-      startBtn.disabled = true; startBtn.textContent = busyLabel;
       const res = await withTimeout(saveRecord(rec), 15000, 'Kayıt');
       if (!res) throw new Error('depolama yanıtı boş');
 
       rememberTeknisyen(teknisyen);
       clearStartForm();
-      showToast('newToast','ok','Manuel servis kaydı oluşturuldu. "Geçmiş Kayıtlar" sekmesinden görebilirsiniz.');
+      showToast('newToast','ok',`Manuel servis kaydı oluşturuldu. Belge no: ${belgeNo}. "Geçmiş Kayıtlar" sekmesinden görebilirsiniz.`);
       await refreshAll();
       activateTab('list');
     }
@@ -1390,7 +1422,7 @@ function renderOpen(){
     const durLabel = { ok:'', warn:'⚠ ', late:'⏰ ' }[dc] + formatDuration(r.girisISO, null) + ' açık';
     return `
     <tr data-id="${r.id}">
-      <td class="sans"><span class="badge open">AÇIK</span></td>
+      <td class="sans"><span class="badge open">AÇIK</span><br><span style="color:var(--slate-soft);font-size:.72rem;">${escapeHtml(r.belgeNo||'—')}</span></td>
       <td class="sans">${formatDate(r.girisTarihi)}<br><span style="color:var(--slate-soft);">${r.girisSaati}</span><br><span class="dur-badge ${dc}">${durLabel}</span></td>
       <td class="sans cust">${escapeHtml(r.musteri)}</td>
       <td class="sans">${escapeHtml(r.teknisyen)}</td>
@@ -1406,7 +1438,7 @@ function renderOpen(){
 
   wrap.innerHTML = `
     <table class="recs">
-      <thead><tr><th></th><th>Giriş</th><th>Müşteri / Mağaza</th><th>Teknisyen</th><th>Servis nedeni</th><th>İşlemler</th></tr></thead>
+      <thead><tr><th>Belge</th><th>Giriş</th><th>Müşteri / Mağaza</th><th>Teknisyen</th><th>Servis nedeni</th><th>İşlemler</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
   `;
@@ -1578,7 +1610,7 @@ function renderHistory(){
       : '<span class="badge auto">OTOMATİK</span>';
     return `
     <tr data-id="${r.id}">
-      <td class="sans">${turBadge}</td>
+      <td class="sans">${turBadge}<br><span style="color:var(--slate-soft);font-size:.72rem;">${escapeHtml(r.belgeNo||'—')}</span></td>
       <td class="sans">${formatDate(r.girisTarihi)}<br><span style="color:var(--slate-soft);">${r.girisSaati} – ${r.cikisSaati||'—'}</span></td>
       <td class="sans">${formatDuration(r.girisISO, r.cikisISO)}</td>
       <td class="sans cust">${escapeHtml(r.musteri)}</td>
@@ -1632,6 +1664,7 @@ document.getElementById('exportExcelBtn').addEventListener('click', ()=>{
       return;
     }
     const rows = lastFilteredHistory.map(r => ({
+      'Belge No': r.belgeNo || '—',
       'Kayıt Türü': (r.kayitTuru || 'otomatik') === 'manuel' ? 'Manuel' : 'Otomatik',
       'Giriş Tarihi': formatDate(r.girisTarihi),
       'Giriş Saati': r.girisSaati || '',
@@ -1787,6 +1820,11 @@ function buildPdf(r){
   doc.setTextColor(20);
   doc.setFont('Roboto','bold'); doc.setFontSize(14);
   doc.text('SERVİS FORMU', M, y);
+  if (r.belgeNo){
+    doc.setFont('Roboto','bold'); doc.setFontSize(11); doc.setTextColor(198,91,46);
+    doc.text(r.belgeNo, PAGE_W - M, y, { align: 'right' });
+    doc.setTextColor(20);
+  }
   y += 8;
   doc.setDrawColor(198,91,46); doc.setLineWidth(1.6);
   doc.line(M, y, M + 34, y);
@@ -1895,7 +1933,7 @@ function buildPdf(r){
   doc.setDrawColor(228); doc.setLineWidth(0.75);
   doc.line(M, PAGE_H - BORDER - 34, PAGE_W - M, PAGE_H - BORDER - 34);
   doc.setFont('Roboto','normal'); doc.setFontSize(7.6); doc.setTextColor(150);
-  doc.text('Belge no: ' + r.id + '   ·   Kayıt türü: ' + ((r.kayitTuru || 'otomatik') === 'manuel' ? 'Manuel' : 'Otomatik'), M, PAGE_H - BORDER - 20);
+  doc.text('Belge no: ' + (r.belgeNo || '—') + '   ·   Kayıt türü: ' + ((r.kayitTuru || 'otomatik') === 'manuel' ? 'Manuel' : 'Otomatik') + '   ·   Sistem no: ' + r.id, M, PAGE_H - BORDER - 20);
   doc.text('intvd.gib.gov.tr üzerinden değil, Umvion Teknoloji dahili servis kaydı olarak üretilmiştir.', M, PAGE_H - BORDER - 10);
 
 
@@ -1927,6 +1965,7 @@ function openEditScreen(id){
   const r = allRecords.find(x=>x.id===id);
   if (!r) return;
   currentEditingId = id;
+  document.getElementById('e_belge_no').textContent = r.belgeNo || '—';
 
   document.getElementById('e_teknisyen').value = r.teknisyen || '';
   document.getElementById('e_musteri').value = r.musteri || '';
@@ -2055,7 +2094,7 @@ document.getElementById('saveEditBtn').addEventListener('click', async ()=>{
 function openPdfDownloadModal(r){
   const bg = document.getElementById('modalBg');
   const modalBody = document.getElementById('modalBody');
-  const filename = `servis-${r.girisTarihi}-${slug(r.musteri)}.pdf`;
+  const filename = `${r.belgeNo || ('servis-' + r.girisTarihi)}-${slug(r.musteri)}.pdf`;
 
   let dataUri;
   try{
@@ -2255,7 +2294,7 @@ document.getElementById('changePasswordBtn').addEventListener('click', async ()=
 });
 
 function clearBrandForm(){
-  ['b_marka_adi','b_iletisim_kisi','b_telefon','b_email'].forEach(id=>{
+  ['b_marka_adi','b_kisaltma','b_iletisim_kisi','b_telefon','b_email'].forEach(id=>{
     document.getElementById(id).value = '';
   });
   document.getElementById('saveBrandBtn').dataset.editId = '';
@@ -2268,15 +2307,26 @@ document.getElementById('saveBrandBtn').addEventListener('click', async ()=>{
   try{
     const markaAdi = document.getElementById('b_marka_adi').value.trim();
     const email = document.getElementById('b_email').value.trim();
+    const kisaltma = document.getElementById('b_kisaltma').value.trim().toUpperCase();
     if (!markaAdi || !email){
       showToast('adminToast','err','Marka adı ve e-posta zorunludur.');
       return;
     }
+    if (!kisaltma){
+      showToast('adminToast','err','Belge numaraları için kısaltma zorunludur (örn. Karaca için KRC).');
+      return;
+    }
     const btn = document.getElementById('saveBrandBtn');
     const editId = btn.dataset.editId;
+    const dupe = allBrands.find(b => b.id !== editId && (b.kisaltma||'').toUpperCase() === kisaltma);
+    if (dupe){
+      showToast('adminToast','err', `Bu kısaltma zaten "${dupe.markaAdi}" markasında kullanılıyor. Belge numaralarının karışmaması için farklı bir kısaltma seçin.`);
+      return;
+    }
     const brand = {
       id: editId || ('brand_' + Date.now() + '_' + Math.random().toString(36).slice(2,8)),
       markaAdi: markaAdi,
+      kisaltma: kisaltma,
       iletisimKisi: document.getElementById('b_iletisim_kisi').value.trim(),
       telefon: document.getElementById('b_telefon').value.trim(),
       email: email
@@ -2300,9 +2350,11 @@ function renderBrandsTable(){
   const rows = allBrands.map(b => `
     <tr data-id="${b.id}">
       <td class="sans cust">${escapeHtml(b.markaAdi)}</td>
+      <td class="sans">${escapeHtml(b.kisaltma||'—')}</td>
       <td class="sans">${escapeHtml(b.iletisimKisi||'—')}</td>
       <td class="sans">${escapeHtml(b.telefon||'—')}</td>
       <td class="sans">${escapeHtml(b.email)}</td>
+      <td class="sans" style="color:var(--slate-soft);">${b.sayac || 0}</td>
       <td>
         <div class="actions">
           <button data-act="editbrand" data-id="${b.id}">Düzenle</button>
@@ -2313,7 +2365,7 @@ function renderBrandsTable(){
   `).join('');
   wrap.innerHTML = `
     <table class="recs">
-      <thead><tr><th>Marka</th><th>İletişim Kişisi</th><th>Telefon</th><th>E-posta</th><th>İşlemler</th></tr></thead>
+      <thead><tr><th>Marka</th><th>Kısaltma</th><th>İletişim Kişisi</th><th>Telefon</th><th>E-posta</th><th>Son belge no</th><th>İşlemler</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
   `;
@@ -2322,6 +2374,7 @@ function renderBrandsTable(){
       const b = allBrands.find(x=>x.id===btn.dataset.id);
       if (!b) return;
       document.getElementById('b_marka_adi').value = b.markaAdi || '';
+      document.getElementById('b_kisaltma').value = b.kisaltma || '';
       document.getElementById('b_iletisim_kisi').value = b.iletisimKisi || '';
       document.getElementById('b_telefon').value = b.telefon || '';
       document.getElementById('b_email').value = b.email || '';
