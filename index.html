@@ -158,6 +158,16 @@
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
   }
 
+  .urun-row{
+    display:grid;grid-template-columns:1fr 100px auto;gap:10px;margin-bottom:10px;align-items:center;
+  }
+  @media (max-width:560px){.urun-row{grid-template-columns:1fr 80px auto;}}
+  .urun-row input{padding:9px 11px;font-size:.9rem;}
+  .urun-row button{
+    font-family:"Inter",sans-serif;font-size:.72rem;border:1px solid var(--line);background:#fff;
+    color:var(--signal);border-radius:2px;padding:9px 10px;cursor:pointer;white-space:nowrap;
+  }
+
   table.recs{width:100%;border-collapse:collapse;font-family:"Inter",sans-serif;font-size:.85rem;}
   table.recs th{text-align:left;font-weight:500;color:var(--slate-soft);font-size:.72rem;padding:0 10px 8px;border-bottom:1px solid var(--line);}
   table.recs td{padding:12px 10px;border-bottom:1px solid var(--line);vertical-align:top;}
@@ -234,6 +244,8 @@
     <button class="active" data-tab="new">Yeni Servis Aç</button>
     <button data-tab="open">Açık Servisler <span class="count" id="openCount">0</span></button>
     <button data-tab="list">Geçmiş Kayıtlar</button>
+    <button data-tab="teslimat">Teslimat Formu</button>
+    <button data-tab="teslimatlist">Teslimat Geçmişi</button>
     <button data-tab="stats">İstatistikler</button>
     <button data-tab="admin">Yönetici Paneli</button>
   </nav>
@@ -585,6 +597,82 @@
     <div id="recWrap"></div>
   </section>
 
+  <!-- ============ TESLİMAT FORMU (create) ============ -->
+  <section id="tab-teslimat">
+    <div id="teslimatToast" class="toast"></div>
+
+    <div class="stamp-row">
+      <div class="dot"></div>
+      <div class="txt">Tarih: <b id="t_tarih_ozet">—</b> · sistem saatinden otomatik alınır, değiştirilemez.</div>
+    </div>
+
+    <div id="teslimatForm">
+      <fieldset>
+        <legend>TESLİMAT BİLGİLERİ</legend>
+        <div class="row2">
+          <div class="field">
+            <label for="t_marka">Marka</label>
+            <select id="t_marka">
+              <option value="">Marka seçin…</option>
+            </select>
+            <div class="hint">Marka seçilince teslim alan ve adres bilgileri otomatik doldurulur (dilerseniz düzenleyebilirsiniz).</div>
+          </div>
+          <div class="field">
+            <label for="t_adres">Teslim edilecek adres</label>
+            <input type="text" id="t_adres" placeholder="Marka seçince otomatik dolar">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="t_teslim_eden">Teslim eden (teknisyen)</label>
+            <input type="text" id="t_teslim_eden" placeholder="Örn. Ahmet Yılmaz" list="teknisyenList">
+          </div>
+          <div class="field">
+            <label for="t_teslim_alan">Teslim alan (marka yetkilisi)</label>
+            <input type="text" id="t_teslim_alan" placeholder="Marka seçince otomatik dolar, düzenlenebilir">
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>ÜRÜN / ÜRÜNLER</legend>
+        <div id="t_urun_rows"></div>
+        <button type="button" class="ghost" id="t_urun_ekle_btn" style="margin-top:6px;">+ Ürün ekle</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>İMZA</legend>
+        <div class="sig-block">
+          <div class="sig-head">
+            <span>Teslim alan imzası</span>
+            <button type="button" data-clear="sigTeslimAlan">Temizle</button>
+          </div>
+          <canvas class="pad" id="sigTeslimAlan"></canvas>
+        </div>
+        <div class="hint" style="margin-top:8px;">Kaydettiğinizde marka e-postasına otomatik olarak PDF ekli bir bilgilendirme gider.</div>
+      </fieldset>
+
+      <div class="submit-row">
+        <button type="button" class="ghost" id="resetTeslimatBtn">Formu temizle</button>
+        <button type="button" class="primary" id="saveTeslimatBtn">Teslimat formunu kaydet</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TESLİMAT GEÇMİŞİ ============ -->
+  <section id="tab-teslimatlist">
+    <div class="filters">
+      <input type="text" id="tfilt_marka" placeholder="Marka ara">
+      <input type="text" id="tfilt_teslimeden" placeholder="Teslim eden ara" list="teknisyenList">
+      <input type="date" id="tfilt_tarih">
+      <button id="tfilt_clear">Filtreleri temizle</button>
+    </div>
+    <div class="rec-toolbar">
+      <div class="rec-count" id="teslimatRecCount"></div>
+    </div>
+    <div id="teslimatRecWrap"></div>
+  </section>
+
   <!-- ============ STATISTICS ============ -->
   <section id="tab-stats">
     <div class="filters" style="grid-template-columns:1fr auto;">
@@ -690,6 +778,10 @@
         <div class="field">
           <label for="b_email">E-posta (bildirimler buraya gider)</label>
           <input type="email" id="b_email" placeholder="ornek@marka.com">
+        </div>
+        <div class="field">
+          <label for="b_adres">Teslimat / servis adresi (teslimat formlarında otomatik doldurulur)</label>
+          <input type="text" id="b_adres" placeholder="Örn. Merkez Mah. Örnek Cad. No:1, Kadıköy / İstanbul">
         </div>
         <div class="submit-row">
           <button type="button" class="ghost" id="clearBrandFormBtn">Formu temizle</button>
@@ -810,12 +902,14 @@ async function sendServiceEmail(kind, rec){
 
 const COLLECTION_NAME = 'umvionServisFormlari';
 const BRANDS_COLLECTION = 'umvionMarkalar';
+const DELIVERY_COLLECTION = 'umvionTeslimatFormlari';
 const ADMIN_DOC_PATH = 'umvionAyarlar/admin';
 const MASTER_RESET_CODE = '07192244';
 let firebaseReady = false;
 let db = null;
 let allRecords = [];
 let allBrands = [];
+let allDeliveries = [];
 let currentEditingId = null;
 
 async function sha256Hex(text){
@@ -837,6 +931,7 @@ function initFirebase(){
     firebaseReady = true;
     startRealtimeSync();
     startBrandsSync();
+    startDeliverySync();
     ensureAdminSeed();
   }catch(err){
     console.error(err);
@@ -875,6 +970,28 @@ function startBrandsSync(){
   );
 }
 
+function startDeliverySync(){
+  db.collection(DELIVERY_COLLECTION).onSnapshot(
+    (snapshot) => {
+      allDeliveries = snapshot.docs.map(d => d.data());
+      const activeSection = document.querySelector('.shell section.active');
+      if (activeSection && activeSection.id === 'tab-teslimatlist') renderDeliveryHistory();
+    },
+    (err) => { console.error('Teslimat senkronizasyon hatası:', err); }
+  );
+}
+
+async function saveDelivery(rec){
+  if (!firebaseReady) throw new Error('Bulut veritabanı yapılandırılmamış.');
+  await db.collection(DELIVERY_COLLECTION).doc(rec.id).set(rec);
+  return { key: rec.id };
+}
+async function deleteDelivery(id){
+  if (!firebaseReady) throw new Error('Bulut veritabanı yapılandırılmamış.');
+  await db.collection(DELIVERY_COLLECTION).doc(id).delete();
+  return { deleted: true };
+}
+
 async function saveBrand(brand){
   if (!firebaseReady) throw new Error('Bulut veritabanı yapılandırılmamış.');
   // merge:true — kısaltma/iletişim gibi alanları düzenlerken belge sayacını
@@ -894,6 +1011,19 @@ async function getNextBelgeNo(brandId, kisaltma){
   });
   const kis = (kisaltma || 'MRK').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6) || 'MRK';
   return 'UMV' + kis + String(nextCount).padStart(5, '0');
+}
+async function getNextTeslimatBelgeNo(brandId, kisaltma){
+  if (!firebaseReady) throw new Error('Bulut veritabanı yapılandırılmamış.');
+  const brandRef = db.collection(BRANDS_COLLECTION).doc(brandId);
+  const nextCount = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(brandRef);
+    const current = (snap.exists && snap.data().teslimatSayac) ? snap.data().teslimatSayac : 0;
+    const next = current + 1;
+    tx.set(brandRef, { teslimatSayac: next }, { merge: true });
+    return next;
+  });
+  const kis = (kisaltma || 'MRK').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6) || 'MRK';
+  return 'UMV' + kis + 'IRS' + String(nextCount).padStart(5, '0');
 }
 async function deleteBrand(id){
   if (!firebaseReady) throw new Error('Bulut veritabanı yapılandırılmamış.');
@@ -964,6 +1094,8 @@ function activateTab(name){
   if (name === 'open') renderOpen();
   if (name === 'stats') renderStats();
   if (name === 'admin') showAdminView();
+  if (name === 'teslimat') prepTeslimatForm();
+  if (name === 'teslimatlist') renderDeliveryHistory();
 }
 document.querySelectorAll('nav.tabs button').forEach(btn=>{
   btn.addEventListener('click', ()=> activateTab(btn.dataset.tab));
@@ -1079,6 +1211,7 @@ document.querySelectorAll('[data-clear]').forEach(btn=>{
     if (id === 'sigMusteriM') padMusteriM.clear();
     if (id === 'sigTeknisyenE') padTeknisyenE.clear();
     if (id === 'sigMusteriE') padMusteriE.clear();
+    if (id === 'sigTeslimAlan') padTeslimAlan.clear();
   });
 });
 
@@ -2187,6 +2320,451 @@ function startupCheck(){
   }
 }
 /* ============================================================
+   TESLİMAT FORMU (İrsaliye) — ürün teslimatları için ayrı, daha
+   sade bir form + PDF + mail akışı. Mevcut marka listesini,
+   imza/PDF altyapısını ve belge no mantığını yeniden kullanır.
+   ============================================================ */
+let urunRows = [];
+function addUrunRow(prefill){
+  urunRows.push({
+    id: 'ur_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+    ad: (prefill && prefill.ad) || '',
+    adet: (prefill && prefill.adet) || 1
+  });
+  renderUrunRows();
+}
+function removeUrunRow(rowId){
+  urunRows = urunRows.filter(r=>r.id!==rowId);
+  if (urunRows.length === 0) addUrunRow();
+  else renderUrunRows();
+}
+function renderUrunRows(){
+  const wrap = document.getElementById('t_urun_rows');
+  if (!wrap) return;
+  wrap.innerHTML = urunRows.map(r=>`
+    <div class="urun-row" data-id="${r.id}">
+      <input type="text" class="t-urun-ad" placeholder="Ürün adı" value="${escapeHtml(r.ad)}">
+      <input type="number" class="t-urun-adet" min="1" step="1" value="${r.adet}">
+      <button type="button" data-remove="${r.id}">Kaldır</button>
+    </div>
+  `).join('');
+  wrap.querySelectorAll('.urun-row').forEach(rowEl=>{
+    const rowId = rowEl.dataset.id;
+    const row = urunRows.find(x=>x.id===rowId);
+    if (!row) return;
+    rowEl.querySelector('.t-urun-ad').addEventListener('input', (e)=>{ row.ad = e.target.value; });
+    rowEl.querySelector('.t-urun-adet').addEventListener('input', (e)=>{ row.adet = parseInt(e.target.value,10) || 1; });
+    rowEl.querySelector('button[data-remove]').addEventListener('click', ()=> removeUrunRow(rowId));
+  });
+}
+document.getElementById('t_urun_ekle_btn').addEventListener('click', ()=> addUrunRow());
+
+let padTeslimAlan, teslimatPadReady = false;
+function initTeslimatPad(){
+  try{
+    if (typeof SignaturePad === 'undefined') throw new Error('SignaturePad kütüphanesi yüklenemedi');
+    padTeslimAlan = makePad('sigTeslimAlan');
+    teslimatPadReady = true;
+  }catch(err){
+    console.error(err);
+    showToast('teslimatToast','err','İmza alanı yüklenemedi. Sayfayı yenileyin.');
+  }
+}
+setTimeout(initTeslimatPad, 0);
+
+document.getElementById('t_marka').addEventListener('change', ()=>{
+  const b = allBrands.find(x=>x.id===document.getElementById('t_marka').value);
+  if (b){
+    document.getElementById('t_teslim_alan').value = b.iletisimKisi || '';
+    document.getElementById('t_adres').value = b.adres || '';
+  }
+});
+
+function prepTeslimatForm(){
+  const np = nowParts();
+  document.getElementById('t_tarih_ozet').textContent = formatDate(np.tarih) + ' · ' + np.saat;
+  if (urunRows.length === 0) addUrunRow();
+  try{ const li = document.getElementById('t_teslim_eden'); if (li && !li.value){ const last = localStorage.getItem('umvion_last_teknisyen'); if (last) li.value = last; } }catch(e){}
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{
+      if (teslimatPadReady && padTeslimAlan && padTeslimAlan.__resize) padTeslimAlan.__resize();
+    });
+  });
+}
+
+function clearTeslimatForm(){
+  document.getElementById('t_marka').value = '';
+  document.getElementById('t_adres').value = '';
+  document.getElementById('t_teslim_eden').value = '';
+  document.getElementById('t_teslim_alan').value = '';
+  urunRows = [];
+  addUrunRow();
+  if (teslimatPadReady) padTeslimAlan.clear();
+}
+document.getElementById('resetTeslimatBtn').addEventListener('click', clearTeslimatForm);
+
+document.getElementById('saveTeslimatBtn').addEventListener('click', async ()=>{
+  showToast('teslimatToast','','');
+  const btn = document.getElementById('saveTeslimatBtn');
+  try{
+    const markaId = document.getElementById('t_marka').value;
+    const brand = allBrands.find(b=>b.id===markaId);
+    const teslimEden = document.getElementById('t_teslim_eden').value.trim();
+    const teslimAlan = document.getElementById('t_teslim_alan').value.trim();
+    const adres = document.getElementById('t_adres').value.trim();
+
+    if (!markaId || !brand){
+      showToast('teslimatToast','err','Lütfen bir marka seçin.');
+      return;
+    }
+    if (!teslimEden || !teslimAlan){
+      showToast('teslimatToast','err','Teslim eden ve teslim alan adlarını girin.');
+      return;
+    }
+    const gecerliUrunler = urunRows.filter(r=>r.ad.trim());
+    if (!gecerliUrunler.length){
+      showToast('teslimatToast','err','En az bir ürün girin.');
+      return;
+    }
+    if (!teslimatPadReady || !padTeslimAlan){
+      showToast('teslimatToast','err','İmza alanı henüz hazır değil. Sayfayı yenileyip tekrar deneyin.');
+      return;
+    }
+    if (padTeslimAlan.isEmpty()){
+      showToast('teslimatToast','err','Kaydetmeden önce teslim alan imzasını alın.');
+      return;
+    }
+    if (!firebaseReady){
+      showToast('teslimatToast','err','Bulut veritabanına bağlanılamıyor.');
+      return;
+    }
+
+    btn.disabled = true; btn.textContent = 'Kaydediliyor…';
+    const belgeNo = await getNextTeslimatBelgeNo(brand.id, brand.kisaltma);
+    const np = nowParts();
+    const rec = {
+      id: 'trs_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
+      belgeNo: belgeNo,
+      marka: brand.markaAdi,
+      markaEmail: brand.email,
+      markaIletisimKisi: brand.iletisimKisi || '',
+      teslimEden: teslimEden,
+      teslimAlan: teslimAlan,
+      adres: adres,
+      urunler: gecerliUrunler.map(u=>({ ad: u.ad.trim(), adet: u.adet || 1 })),
+      tarih: np.tarih,
+      saat: np.saat,
+      tarihISO: np.iso,
+      sigTeslimAlan: padTeslimAlan.toDataURL('image/png')
+    };
+
+    const res = await withTimeout(saveDelivery(rec), 15000, 'Kayıt');
+    if (!res) throw new Error('depolama yanıtı boş');
+
+    sendDeliveryEmail(rec);
+    rememberTeknisyen(teslimEden);
+    clearTeslimatForm();
+    showToast('teslimatToast','ok', `Teslimat formu kaydedildi. Belge no: ${belgeNo}.`);
+    await refreshAll();
+    activateTab('teslimatlist');
+  }catch(err){
+    console.error(err);
+    showToast('teslimatToast','err','Kaydedilemedi: ' + (err && err.message ? err.message : 'bilinmeyen hata'));
+  }finally{
+    btn.disabled = false; btn.textContent = 'Teslimat formunu kaydet';
+  }
+});
+
+async function sendDeliveryEmail(rec){
+  if (!rec.markaEmail) return;
+  try{
+    const subject = 'Teslimat Formu - ' + (rec.marka || '') + ' - ' + rec.belgeNo;
+    const urunSatirlari = rec.urunler.map(u =>
+      `<tr><td style="padding:4px 10px 4px 0;border-bottom:1px solid #eee;">${escapeHtml(u.ad)}</td><td style="padding:4px 0;border-bottom:1px solid #eee;text-align:right;">${u.adet}</td></tr>`
+    ).join('');
+    const html = `
+      <div style="font-family:Arial,sans-serif;font-size:15px;color:#13202b;line-height:1.5;">
+        <p>Merhaba ${escapeHtml(rec.markaIletisimKisi || '')},</p>
+        <p><b>${escapeHtml(rec.teslimEden)}</b> tarafından <b>${escapeHtml(rec.marka || '')}</b> markanıza
+           aşağıdaki ürün(ler) teslim edilmiştir.</p>
+        <table style="border-collapse:collapse;width:100%;max-width:420px;margin:14px 0;">
+          <thead><tr>
+            <th style="text-align:left;border-bottom:2px solid #13202b;padding:4px 10px 6px 0;">Ürün</th>
+            <th style="text-align:right;border-bottom:2px solid #13202b;padding:4px 0 6px;">Adet</th>
+          </tr></thead>
+          <tbody>${urunSatirlari}</tbody>
+        </table>
+        <p>Teslim alan: <b>${escapeHtml(rec.teslimAlan)}</b><br>
+           Adres: ${escapeHtml(rec.adres || '—')}<br>
+           Tarih: ${formatDate(rec.tarih)} ${rec.saat}</p>
+        <p>Teslimat formunu ekte PDF olarak bulabilirsiniz.</p>
+        <p>Bilgilerinize sunarız.<br>Umvion Teknoloji</p>
+      </div>`;
+
+    const payload = { to: rec.markaEmail, subject, html };
+    try{
+      const pdfDoc = buildDeliveryPdf(rec);
+      const dataUri = pdfDoc.output('datauristring');
+      payload.attachments = [{
+        filename: `${rec.belgeNo}-${slug(rec.marka)}.pdf`,
+        content: dataUri.split(',')[1]
+      }];
+    }catch(pdfErr){
+      console.error('Teslimat PDF eki hazırlanamadı:', pdfErr);
+    }
+
+    const res = await fetch(MAIL_WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok){
+      console.error('Teslimat bildirimi gönderilemedi:', res.status, await res.text());
+    }
+  }catch(err){
+    console.error('Teslimat bildirimi gönderilemedi:', err);
+  }
+}
+
+function buildDeliveryPdf(r){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  ensureTurkishFonts(doc);
+  doc.setFont('Roboto','normal');
+
+  const PAGE_W = 595.28, PAGE_H = 841.89;
+  const BORDER = 26, PAD = 20, M = BORDER + PAD;
+  const CONTENT_W = PAGE_W - 2*M;
+
+  doc.setDrawColor(200); doc.setLineWidth(1);
+  doc.roundedRect(BORDER, BORDER, PAGE_W - 2*BORDER, PAGE_H - 2*BORDER, 4, 4);
+
+  let y = M + 6;
+  const logoW = 78, logoH = logoW * (375/656);
+  const logoX = PAGE_W - M - logoW;
+  const logoY = M - 6;
+  const titleMaxW = logoX - M - 14;
+
+  doc.setFont('Roboto','bold'); doc.setFontSize(13.5); doc.setTextColor(20);
+  const titleLines = doc.splitTextToSize('UMVİON TEKNOLOJİ LİMİTED ŞİRKETİ', titleMaxW);
+  doc.text(titleLines, M, y);
+  y += titleLines.length * 15;
+
+  doc.setFont('Roboto','normal'); doc.setFontSize(8.3); doc.setTextColor(110);
+  const addrLines = doc.splitTextToSize(
+    'Üniversite Mah. Sarıgül Sk. İstanbul Teknokent No:37/1 İç Kapı No:46, Avcılar / İstanbul',
+    titleMaxW
+  );
+  doc.text(addrLines, M, y);
+  y += addrLines.length * 10.5;
+
+  try{ doc.addImage(LOGO_DATA_URI, 'JPEG', logoX, logoY, logoW, logoH); }catch(e){}
+
+  y = Math.max(y, logoY + logoH) + 14;
+  doc.setDrawColor(210); doc.setLineWidth(0.75);
+  doc.line(M, y, PAGE_W - M, y);
+  y += 24;
+
+  doc.setTextColor(20);
+  doc.setFont('Roboto','bold'); doc.setFontSize(14);
+  doc.text('TESLİMAT FORMU (İRSALİYE)', M, y);
+  if (r.belgeNo){
+    doc.setFont('Roboto','bold'); doc.setFontSize(11); doc.setTextColor(198,91,46);
+    doc.text(r.belgeNo, PAGE_W - M, y, { align: 'right' });
+    doc.setTextColor(20);
+  }
+  y += 8;
+  doc.setDrawColor(198,91,46); doc.setLineWidth(1.6);
+  doc.line(M, y, M + 34, y);
+  y += 22;
+
+  function labelStyle(){ doc.setFont('Roboto','bold'); doc.setFontSize(8.3); doc.setTextColor(120); }
+  function valueStyle(){ doc.setFont('Roboto','normal'); doc.setFontSize(10.5); doc.setTextColor(24); }
+  function fieldPair(l1,v1,l2,v2){
+    const gap = 24;
+    const colW = (CONTENT_W - gap)/2;
+    labelStyle();
+    doc.text(l1.toUpperCase(), M, y);
+    doc.text(l2.toUpperCase(), M+colW+gap, y);
+    y += 13;
+    valueStyle();
+    const lines1 = doc.splitTextToSize(v1||'—', colW);
+    const lines2 = doc.splitTextToSize(v2||'—', colW);
+    doc.text(lines1, M, y);
+    doc.text(lines2, M+colW+gap, y);
+    y += Math.max(lines1.length, lines2.length) * 13.5 + 13;
+  }
+  function field(label, value){
+    labelStyle();
+    doc.text(label.toUpperCase(), M, y);
+    y += 13;
+    valueStyle();
+    const lines = doc.splitTextToSize(value || '—', CONTENT_W);
+    doc.text(lines, M, y);
+    y += lines.length * 13.5 + 13;
+  }
+
+  fieldPair('Tarih / Saat', `${formatDate(r.tarih)}    ${r.saat}`, 'Marka', r.marka);
+  fieldPair('Teslim eden', r.teslimEden, 'Teslim alan', r.teslimAlan);
+  field('Teslim edilecek adres', r.adres);
+
+  doc.setDrawColor(228); doc.setLineWidth(0.75);
+  doc.line(M, y, PAGE_W - M, y);
+  y += 18;
+
+  labelStyle();
+  doc.text('ÜRÜN / ÜRÜNLER', M, y);
+  y += 14;
+
+  const colUrunW = CONTENT_W - 70;
+  doc.setFillColor(240,242,241);
+  doc.rect(M, y - 10, CONTENT_W, 20, 'F');
+  doc.setFont('Roboto','bold'); doc.setFontSize(8.6); doc.setTextColor(90);
+  doc.text('ÜRÜN ADI', M + 6, y + 4);
+  doc.text('ADET', M + colUrunW + 20, y + 4, { align: 'right' });
+  y += 20;
+
+  valueStyle();
+  (r.urunler || []).forEach((u, idx) => {
+    if (y > PAGE_H - BORDER - 140){
+      doc.addPage();
+      doc.setDrawColor(200); doc.setLineWidth(1);
+      doc.roundedRect(BORDER, BORDER, PAGE_W - 2*BORDER, PAGE_H - 2*BORDER, 4, 4);
+      y = M + 20;
+    }
+    const lines = doc.splitTextToSize(u.ad, colUrunW - 12);
+    doc.text(lines, M + 6, y);
+    doc.text(String(u.adet), M + colUrunW + 20, y, { align: 'right' });
+    y += lines.length * 13 + 6;
+    doc.setDrawColor(235);
+    doc.line(M, y - 4, PAGE_W - M, y - 4);
+  });
+  y += 20;
+
+  if (y > PAGE_H - BORDER - 150){
+    doc.addPage();
+    doc.setDrawColor(200); doc.setLineWidth(1);
+    doc.roundedRect(BORDER, BORDER, PAGE_W - 2*BORDER, PAGE_H - 2*BORDER, 4, 4);
+    y = M + 20;
+  }
+
+  doc.setDrawColor(228); doc.setLineWidth(0.75);
+  doc.line(M, y, PAGE_W - M, y);
+  y += 24;
+
+  const sigW = (CONTENT_W - 24) / 2;
+  const sigBoxH = 92;
+  labelStyle();
+  doc.text('TESLİM ALAN İMZASI', M, y);
+  y += 10;
+  doc.setDrawColor(215); doc.setLineWidth(0.75);
+  doc.roundedRect(M, y, sigW, sigBoxH, 3, 3);
+  try{ if (r.sigTeslimAlan) doc.addImage(r.sigTeslimAlan, 'PNG', M+6, y+6, sigW-12, sigBoxH-24); }catch(e){}
+  const nameY = y + sigBoxH - 10;
+  doc.setDrawColor(190);
+  doc.line(M+10, nameY, M+sigW-10, nameY);
+  valueStyle(); doc.setFontSize(9); doc.setTextColor(70);
+  doc.text(r.teslimAlan || '', M+10, nameY + 12);
+  y += sigBoxH + 30;
+
+  doc.setDrawColor(228); doc.setLineWidth(0.75);
+  doc.line(M, PAGE_H - BORDER - 34, PAGE_W - M, PAGE_H - BORDER - 34);
+  doc.setFont('Roboto','normal'); doc.setFontSize(7.6); doc.setTextColor(150);
+  doc.text('Belge no: ' + (r.belgeNo || '—') + '   ·   Sistem no: ' + r.id, M, PAGE_H - BORDER - 20);
+  doc.text('Umvion Teknoloji dahili teslimat kaydı olarak üretilmiştir.', M, PAGE_H - BORDER - 10);
+
+  return doc;
+}
+
+function openDeliveryPdfModal(r){
+  const bg = document.getElementById('modalBg');
+  const modalBody = document.getElementById('modalBody');
+  const filename = `${r.belgeNo}-${slug(r.marka)}.pdf`;
+  let dataUri;
+  try{
+    const doc = buildDeliveryPdf(r);
+    dataUri = doc.output('datauristring');
+  }catch(err){
+    console.error(err);
+    alert('PDF oluşturulamadı: ' + (err && err.message ? err.message : 'bilinmeyen hata'));
+    return;
+  }
+  modalBody.className = 'modal';
+  modalBody.innerHTML = `
+    <h3>${escapeHtml(r.marka)} — Teslimat Formu</h3>
+    <p style="margin-top:-6px;">${formatDate(r.tarih)} · ${r.saat} · ${escapeHtml(r.belgeNo)}</p>
+    <p>PDF hazır. Aşağıdaki bağlantıya tıklayarak cihazınıza indirebilirsiniz.</p>
+    <div class="modal-actions">
+      <button class="ghost" id="pdfClose">Kapat</button>
+      <a class="primary" id="pdfDownloadLink" href="${dataUri}" download="${filename}">PDF indir</a>
+    </div>
+  `;
+  bg.classList.add('active');
+  document.getElementById('pdfClose').onclick = ()=>{
+    bg.classList.remove('active');
+    modalBody.className = 'modal';
+  };
+}
+
+function renderDeliveryHistory(){
+  const fm = document.getElementById('tfilt_marka').value.trim().toLowerCase();
+  const ft = document.getElementById('tfilt_teslimeden').value.trim().toLowerCase();
+  const fd = document.getElementById('tfilt_tarih').value;
+
+  const filtered = allDeliveries.filter(r=>{
+    if (fm && !(r.marka||'').toLowerCase().includes(fm)) return false;
+    if (ft && !(r.teslimEden||'').toLowerCase().includes(ft)) return false;
+    if (fd && r.tarih !== fd) return false;
+    return true;
+  }).sort((a,b)=> (b.tarihISO||'').localeCompare(a.tarihISO||''));
+
+  document.getElementById('teslimatRecCount').textContent = filtered.length + ' kayıt' + (filtered.length !== allDeliveries.length ? ' (toplam ' + allDeliveries.length + ')' : '');
+
+  const wrap = document.getElementById('teslimatRecWrap');
+  if (filtered.length === 0){
+    wrap.innerHTML = `<div class="empty"><div class="big">Kayıt yok</div><div>Filtrelerinize uyan bir teslimat formu bulunamadı.</div></div>`;
+    return;
+  }
+
+  const rows = filtered.map(r=>{
+    const ilkUrun = r.urunler && r.urunler[0] ? `${r.urunler[0].ad} (${r.urunler[0].adet})` : '—';
+    const ozet = (r.urunler && r.urunler.length > 1) ? `${ilkUrun} +${r.urunler.length - 1} daha` : ilkUrun;
+    return `
+    <tr data-id="${r.id}">
+      <td class="sans" style="color:var(--slate-soft);font-size:.75rem;">${escapeHtml(r.belgeNo)}</td>
+      <td class="sans">${formatDate(r.tarih)}<br><span style="color:var(--slate-soft);">${r.saat}</span></td>
+      <td class="sans cust">${escapeHtml(r.marka)}</td>
+      <td class="sans">${escapeHtml(r.teslimEden)}</td>
+      <td class="sans">${escapeHtml(r.teslimAlan)}</td>
+      <td class="sans desc-cell" title="${escapeHtml(ozet)}">${escapeHtml(ozet)}</td>
+      <td><div class="actions"><button data-act="pdf" data-id="${r.id}">PDF indir</button></div></td>
+    </tr>
+  `;}).join('');
+
+  wrap.innerHTML = `
+    <table class="recs">
+      <thead><tr><th>Belge</th><th>Tarih</th><th>Marka</th><th>Teslim Eden</th><th>Teslim Alan</th><th>Ürünler</th><th>İşlemler</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+  wrap.querySelectorAll('button[data-act="pdf"]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const r = allDeliveries.find(x=>x.id===btn.dataset.id);
+      if (r) openDeliveryPdfModal(r);
+    });
+  });
+}
+['tfilt_marka','tfilt_teslimeden','tfilt_tarih'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', renderDeliveryHistory);
+});
+document.getElementById('tfilt_clear').addEventListener('click', ()=>{
+  document.getElementById('tfilt_marka').value = '';
+  document.getElementById('tfilt_teslimeden').value = '';
+  document.getElementById('tfilt_tarih').value = '';
+  renderDeliveryHistory();
+});
+
+/* ============================================================
    ADMIN PANEL — login (session-only), password change/reset,
    and brand (marka) management with email notification routing.
    ============================================================ */
@@ -2294,7 +2872,7 @@ document.getElementById('changePasswordBtn').addEventListener('click', async ()=
 });
 
 function clearBrandForm(){
-  ['b_marka_adi','b_kisaltma','b_iletisim_kisi','b_telefon','b_email'].forEach(id=>{
+  ['b_marka_adi','b_kisaltma','b_iletisim_kisi','b_telefon','b_email','b_adres'].forEach(id=>{
     document.getElementById(id).value = '';
   });
   document.getElementById('saveBrandBtn').dataset.editId = '';
@@ -2329,7 +2907,8 @@ document.getElementById('saveBrandBtn').addEventListener('click', async ()=>{
       kisaltma: kisaltma,
       iletisimKisi: document.getElementById('b_iletisim_kisi').value.trim(),
       telefon: document.getElementById('b_telefon').value.trim(),
-      email: email
+      email: email,
+      adres: document.getElementById('b_adres').value.trim()
     };
     await withTimeout(saveBrand(brand), 15000, 'Marka kaydı');
     clearBrandForm();
@@ -2378,6 +2957,7 @@ function renderBrandsTable(){
       document.getElementById('b_iletisim_kisi').value = b.iletisimKisi || '';
       document.getElementById('b_telefon').value = b.telefon || '';
       document.getElementById('b_email').value = b.email || '';
+      document.getElementById('b_adres').value = b.adres || '';
       document.getElementById('saveBrandBtn').dataset.editId = b.id;
       document.getElementById('saveBrandBtn').textContent = 'Değişiklikleri kaydet';
     });
@@ -2397,12 +2977,14 @@ function renderBrandsTable(){
 }
 
 function refreshBrandOptions(){
-  const sel = document.getElementById('s_marka');
-  if (!sel) return;
-  const current = sel.value;
-  sel.innerHTML = '<option value="">Marka seçin…</option>' +
-    allBrands.map(b => `<option value="${b.id}">${escapeHtml(b.markaAdi)}</option>`).join('');
-  if (current && allBrands.some(b=>b.id===current)) sel.value = current;
+  ['s_marka','t_marka'].forEach(selId=>{
+    const sel = document.getElementById(selId);
+    if (!sel) return;
+    const current = sel.value;
+    sel.innerHTML = '<option value="">Marka seçin…</option>' +
+      allBrands.map(b => `<option value="${b.id}">${escapeHtml(b.markaAdi)}</option>`).join('');
+    if (current && allBrands.some(b=>b.id===current)) sel.value = current;
+  });
 }
 
 setTimeout(startupCheck, 2500);
