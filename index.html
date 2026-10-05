@@ -208,7 +208,37 @@
   .modal-bg{display:none;position:fixed;inset:0;background:rgba(19,32,43,.55);align-items:center;justify-content:center;z-index:50;padding:20px;}
   .modal-bg.active{display:flex;}
   .modal{background:#fff;max-width:460px;width:100%;border-radius:4px;padding:26px;font-family:"Inter",sans-serif;}
-  .modal.wide{max-width:680px;}
+  .modal.wide{max-width:680px;max-height:92vh;overflow-y:auto;}
+  .pv{font-family:"Inter",sans-serif;color:var(--ink);}
+  .pv-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+  .pv-bar h3{margin:0;}
+  .pv-bar .pv-btns{display:flex;gap:8px;}
+  .pv-bar .pv-btns .ghost,.pv-bar .pv-btns .primary{padding:9px 16px;font-size:.82rem;}
+  .pv-paper{border:1px solid var(--line);border-radius:4px;padding:18px 18px 16px;background:#fff;}
+  .pv-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:14px;}
+  .pv-co{font-weight:700;font-size:.9rem;}
+  .pv-addr{font-size:.66rem;color:var(--slate-soft);margin-top:3px;line-height:1.4;}
+  .pv-logo{height:38px;width:auto;flex:none;}
+  .pv-title{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:14px;}
+  .pv-title b{font-size:1.02rem;}
+  .pv-title span{color:var(--signal);font-weight:700;font-size:.82rem;}
+  .pv-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 18px;margin-bottom:6px;}
+  @media (max-width:480px){.pv-grid{grid-template-columns:1fr;}}
+  .pv-k{font-size:.64rem;font-weight:600;color:var(--slate-soft);text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px;}
+  .pv-v{font-size:.86rem;white-space:pre-wrap;word-break:break-word;line-height:1.45;}
+  .pv-sec{border-top:1px solid var(--line);padding-top:12px;margin-top:12px;}
+  .pv-sec .pv-item{margin-bottom:12px;}
+  .pv-sigs{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end;}
+  .pv-sig{border:1px solid var(--line);border-radius:3px;padding:6px;text-align:center;}
+  .pv-sig img{max-width:100%;height:70px;object-fit:contain;display:block;margin:0 auto;}
+  .pv-sig div{font-size:.72rem;color:var(--slate);border-top:1px solid var(--line);margin-top:4px;padding-top:4px;}
+  .pv-photos{display:flex;gap:8px;flex-wrap:wrap;}
+  .pv-photos img{width:96px;height:96px;object-fit:cover;border:1px solid var(--line);border-radius:3px;}
+  .pv-table{width:100%;border-collapse:collapse;font-size:.85rem;}
+  .pv-table th{text-align:left;font-size:.66rem;color:var(--slate-soft);padding:6px 8px;background:#f0f2f1;}
+  .pv-table td{padding:7px 8px;border-bottom:1px solid var(--line);}
+  .pv-table td.n,.pv-table th.n{text-align:right;}
+  .pv-foot{font-size:.66rem;color:var(--slate-soft);margin-top:12px;}
   .modal h3{margin:0 0 8px;font-family:"Iowan Old Style",Georgia,serif;font-size:1.2rem;}
   .modal p{font-size:.88rem;color:var(--slate);line-height:1.5;}
   .modal .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;flex-wrap:wrap;}
@@ -1762,6 +1792,7 @@ function renderHistory(){
       <td class="sans desc-cell" title="${escapeHtml(r.islem)}">${escapeHtml(r.islem || '—')}</td>
       <td>
         <div class="actions">
+          <button data-act="preview" data-id="${r.id}">Önizle</button>
           <button data-act="pdf" data-id="${r.id}">PDF indir</button>
           <button data-act="edit" data-id="${r.id}">Düzenle</button>
           <button data-act="del" data-id="${r.id}" class="danger">Sil</button>
@@ -2091,7 +2122,10 @@ function handleHistoryAction(act, id){
   const r = allRecords.find(x=>x.id===id);
   if (!r) return;
 
-  if (act === 'pdf'){
+  if (act === 'preview'){
+    openServicePreview(r);
+  }
+  else if (act === 'pdf'){
     openPdfDownloadModal(r);
   }
   else if (act === 'edit'){
@@ -2238,6 +2272,112 @@ document.getElementById('saveEditBtn').addEventListener('click', async ()=>{
    synthetic clicks and pop-ups are blocked by the artifact's sandbox —
    a genuine click on an anchor is not. An embedded <iframe> preview was
    tried but renders blank in this sandbox, so it has been removed. */
+/* ============================================================
+   ÖNİZLEME — kaydı PDF indirmeden, PDF ile aynı düzende ekranda gösterir.
+   (Gömülü PDF mobilde çoğu zaman boş göründüğü için HTML olarak çizilir.)
+   ============================================================ */
+function safeImg(src){
+  return (typeof src === 'string' && /^data:image\/(png|jpeg);base64,[A-Za-z0-9+\/=]+$/.test(src)) ? src : '';
+}
+function pvField(k, v){
+  return `<div><div class="pv-k">${k}</div><div class="pv-v">${escapeHtml(v || '—')}</div></div>`;
+}
+function pvSig(src, name){
+  const s = safeImg(src);
+  return `<div class="pv-sig">${s ? `<img src="${s}" alt="İmza">` : '<div style="border:none;margin:0;padding:24px 0;">İmza yok</div>'}<div>${escapeHtml(name || '')}</div></div>`;
+}
+function showPreviewModal(title, paperHtml, pdfBuilder, filename){
+  const bg = document.getElementById('modalBg');
+  const modalBody = document.getElementById('modalBody');
+  let downloadBtn = '';
+  try{
+    const dataUri = pdfBuilder().output('datauristring');
+    downloadBtn = `<a class="primary" id="pvDownload" href="${dataUri}" download="${escapeHtml(filename)}">PDF indir</a>`;
+  }catch(err){
+    console.error('Önizleme için PDF hazırlanamadı:', err);
+  }
+  modalBody.className = 'modal wide';
+  modalBody.innerHTML = `
+    <div class="pv">
+      <div class="pv-bar">
+        <h3>${escapeHtml(title)}</h3>
+        <div class="pv-btns"><button class="ghost" id="pvClose">Kapat</button>${downloadBtn}</div>
+      </div>
+      <div class="pv-paper">${paperHtml}</div>
+    </div>`;
+  bg.classList.add('active');
+  document.getElementById('pvClose').onclick = ()=>{
+    bg.classList.remove('active');
+    modalBody.className = 'modal';
+  };
+}
+function pvHeader(titleText, belgeNo){
+  return `
+    <div class="pv-head">
+      <div>
+        <div class="pv-co">UMVİON TEKNOLOJİ LİMİTED ŞİRKETİ</div>
+        <div class="pv-addr">Üniversite Mah. Sarıgül Sk. İstanbul Teknokent No:37/1 İç Kapı No:46, Avcılar / İstanbul</div>
+      </div>
+      <img class="pv-logo" src="${LOGO_DATA_URI}" alt="Umvion">
+    </div>
+    <div class="pv-title"><b>${titleText}</b><span>${escapeHtml(belgeNo || '')}</span></div>`;
+}
+
+function openServicePreview(r){
+  const photos = (r.fotograflar || []).map(safeImg).filter(Boolean);
+  const paper = `
+    ${pvHeader('SERVİS FORMU', r.belgeNo)}
+    <div class="pv-grid">
+      ${pvField('Giriş tarihi / saati', formatDate(r.girisTarihi) + '  ' + (r.girisSaati || ''))}
+      ${pvField('Çıkış tarihi / saati', formatDate(r.cikisTarihi) + '  ' + (r.cikisSaati || '—'))}
+      ${pvField('Marka', r.marka)}
+      ${pvField('Mağaza / Şube', r.musteri)}
+      ${pvField('Teknisyen', r.teknisyen)}
+      ${pvField('Telefon', r.telefon)}
+    </div>
+    <div class="pv-grid" style="grid-template-columns:1fr;">${pvField('Adres', r.adres)}</div>
+    <div class="pv-sec">
+      <div class="pv-item">${pvField('Servis nedeni ve açıklaması', r.ariza)}</div>
+      <div class="pv-item">${pvField('Yapılan işlem / çözüm', r.islem)}</div>
+      ${r.malzeme ? `<div class="pv-item">${pvField('Kullanılan malzeme / parça', r.malzeme)}</div>` : ''}
+    </div>
+    <div class="pv-sec">
+      <div class="pv-sigs">
+        <div><div class="pv-k">Teknisyen imzası</div>${pvSig(r.sigTeknisyen, r.teknisyen)}</div>
+        <div><div class="pv-k">Müşteri / mağaza imzası</div>${pvSig(r.sigMusteri, r.yetkili)}</div>
+      </div>
+    </div>
+    ${photos.length ? `<div class="pv-sec"><div class="pv-k">Fotoğraflar</div><div class="pv-photos">${photos.map(p=>`<img src="${p}" alt="Fotoğraf">`).join('')}</div></div>` : ''}
+    <div class="pv-foot">Belge no: ${escapeHtml(r.belgeNo || '—')} · Kayıt türü: ${(r.kayitTuru || 'otomatik') === 'manuel' ? 'Manuel' : 'Otomatik'}</div>`;
+  showPreviewModal('Önizleme — Servis Formu', paper, ()=>buildPdf(r),
+    `${r.belgeNo || ('servis-' + r.girisTarihi)}-${slug(r.musteri)}.pdf`);
+}
+
+function openDeliveryPreview(r){
+  const urunRows = (r.urunler || []).map(u =>
+    `<tr><td>${escapeHtml(u.ad)}</td><td class="n">${escapeHtml(String(u.adet))}</td></tr>`).join('');
+  const paper = `
+    ${pvHeader('TESLİMAT FORMU (İRSALİYE)', r.belgeNo)}
+    <div class="pv-grid">
+      ${pvField('Tarih / saat', formatDate(r.tarih) + '  ' + (r.saat || ''))}
+      ${pvField('Marka', r.marka)}
+      ${pvField('Teslim eden', r.teslimEden)}
+      ${pvField('Teslim alan', r.teslimAlan)}
+    </div>
+    <div class="pv-grid" style="grid-template-columns:1fr;">${pvField('Teslim edilecek adres', r.adres)}</div>
+    <div class="pv-sec">
+      <div class="pv-k" style="margin-bottom:6px;">Ürün / ürünler</div>
+      <table class="pv-table"><thead><tr><th>Ürün adı</th><th class="n">Adet</th></tr></thead><tbody>${urunRows}</tbody></table>
+    </div>
+    <div class="pv-sec">
+      <div class="pv-k">Teslim alan imzası</div>
+      <div style="max-width:260px;">${pvSig(r.sigTeslimAlan, r.teslimAlan)}</div>
+    </div>
+    <div class="pv-foot">Belge no: ${escapeHtml(r.belgeNo || '—')}</div>`;
+  showPreviewModal('Önizleme — Teslimat Formu', paper, ()=>buildDeliveryPdf(r),
+    `${r.belgeNo}-${slug(r.marka)}.pdf`);
+}
+
 function openPdfDownloadModal(r){
   const bg = document.getElementById('modalBg');
   const modalBody = document.getElementById('modalBody');
@@ -2751,7 +2891,7 @@ function renderDeliveryHistory(){
       <td class="sans">${escapeHtml(r.teslimEden)}</td>
       <td class="sans">${escapeHtml(r.teslimAlan)}</td>
       <td class="sans desc-cell" title="${escapeHtml(ozet)}">${escapeHtml(ozet)}</td>
-      <td><div class="actions"><button data-act="pdf" data-id="${r.id}">PDF indir</button></div></td>
+      <td><div class="actions"><button data-act="preview" data-id="${r.id}">Önizle</button><button data-act="pdf" data-id="${r.id}">PDF indir</button></div></td>
     </tr>
   `;}).join('');
 
@@ -2761,10 +2901,12 @@ function renderDeliveryHistory(){
       <tbody>${rows}</tbody>
     </table>
   `;
-  wrap.querySelectorAll('button[data-act="pdf"]').forEach(btn=>{
+  wrap.querySelectorAll('button[data-act]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const r = allDeliveries.find(x=>x.id===btn.dataset.id);
-      if (r) openDeliveryPdfModal(r);
+      if (!r) return;
+      if (btn.dataset.act === 'preview') openDeliveryPreview(r);
+      else openDeliveryPdfModal(r);
     });
   });
 }
