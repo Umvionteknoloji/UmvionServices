@@ -272,20 +272,20 @@
         <legend>ÖN BİLGİLER</legend>
         <div class="row2">
           <div class="field">
-            <label for="s_marka">Marka</label>
+            <label for="s_marka">Marka <span style="color:var(--signal);">*</span></label>
             <select id="s_marka" required>
               <option value="">Marka seçin…</option>
             </select>
             <div class="hint">Listede yoksa Yönetici Paneli'nden ekleyin. Servis başlatıldığında/tamamlandığında bu markanın kayıtlı e-postasına otomatik bilgilendirme gider.</div>
           </div>
           <div class="field">
-            <label for="s_musteri">Mağaza / şube adı</label>
+            <label for="s_musteri">Mağaza / şube adı <span style="color:var(--signal);">*</span></label>
             <input type="text" id="s_musteri" placeholder="Örn. Kadıköy Şubesi" list="musteriList" required>
           </div>
         </div>
         <div class="row2">
           <div class="field">
-            <label for="s_teknisyen">Servisi veren teknisyen</label>
+            <label for="s_teknisyen">Servisi veren teknisyen <span style="color:var(--signal);">*</span></label>
             <input type="text" id="s_teknisyen" placeholder="Örn. Ahmet Yılmaz" list="teknisyenList" required>
           </div>
           <div class="field">
@@ -298,7 +298,7 @@
           <input type="text" id="s_adres" placeholder="Servis yapılan adres">
         </div>
         <div class="field">
-          <label for="s_ariza">Servis nedeni ve açıklaması</label>
+          <label for="s_ariza">Servis nedeni ve açıklaması <span style="color:var(--signal);">*</span></label>
           <textarea id="s_ariza" placeholder="Örn. Arıza tamiri, mağaza açılışı, periyodik bakım, kapanış işlemleri..." required></textarea>
         </div>
       </fieldset>
@@ -459,7 +459,7 @@
   <section id="tab-edit">
     <button class="back-link" id="backToListFromEdit">&larr; Geçmiş kayıtlara dön</button>
     <div id="editToast" class="toast"></div>
-    <div class="stamp-row"><div class="dot"></div><div class="txt">Belge no: <b id="e_belge_no">—</b></div></div>
+    <div class="stamp-row"><div class="dot"></div><div class="txt">Belge no: <b id="e_belge_no">—</b> · Marka: <b id="e_marka_ozet">—</b></div></div>
 
     <div id="editForm">
       <fieldset>
@@ -580,7 +580,7 @@
   <!-- ============ HISTORY / COMPLETED RECORDS ============ -->
   <section id="tab-list">
     <div class="filters">
-      <input type="text" id="filt_musteri" placeholder="Müşteri / mağaza ara" list="musteriList">
+      <input type="text" id="filt_musteri" placeholder="Marka / mağaza ara" list="musteriList">
       <input type="text" id="filt_teknisyen" placeholder="Teknisyen ara" list="teknisyenList">
       <input type="date" id="filt_tarih">
       <select id="filt_tur">
@@ -1410,8 +1410,16 @@ document.getElementById('startBtn').addEventListener('click', async ()=>{
     const markaId = document.getElementById('s_marka').value;
     const brand = allBrands.find(b => b.id === markaId);
 
-    if (!teknisyen || !musteri || !ariza){
-      showToast('newToast','err','Teknisyen, müşteri/mağaza adı ve servis nedeni alanlarını doldurun.');
+    if (!markaId || !brand){
+      showToast('newToast','err','Marka seçimi zorunludur. Listede yoksa Yönetici Paneli\'nden ekleyin.');
+      return;
+    }
+    if (!musteri){
+      showToast('newToast','err','Mağaza / şube adı zorunludur.');
+      return;
+    }
+    if (!teknisyen || !ariza){
+      showToast('newToast','err','Teknisyen ve servis nedeni alanlarını doldurun.');
       return;
     }
     if (!firebaseReady){
@@ -1557,7 +1565,7 @@ function renderOpen(){
     <tr data-id="${r.id}">
       <td class="sans"><span class="badge open">AÇIK</span><br><span style="color:var(--slate-soft);font-size:.72rem;">${escapeHtml(r.belgeNo||'—')}</span></td>
       <td class="sans">${formatDate(r.girisTarihi)}<br><span style="color:var(--slate-soft);">${r.girisSaati}</span><br><span class="dur-badge ${dc}">${durLabel}</span></td>
-      <td class="sans cust">${escapeHtml(r.musteri)}</td>
+      <td class="sans cust">${r.marka ? escapeHtml(r.marka) + '<br><span style="font-weight:400;color:var(--slate-soft);">' + escapeHtml(r.musteri) + '</span>' : escapeHtml(r.musteri)}</td>
       <td class="sans">${escapeHtml(r.teknisyen)}</td>
       <td class="sans desc-cell" title="${escapeHtml(r.ariza)}">${escapeHtml(r.ariza || '—')}</td>
       <td>
@@ -1571,7 +1579,7 @@ function renderOpen(){
 
   wrap.innerHTML = `
     <table class="recs">
-      <thead><tr><th>Belge</th><th>Giriş</th><th>Müşteri / Mağaza</th><th>Teknisyen</th><th>Servis nedeni</th><th>İşlemler</th></tr></thead>
+      <thead><tr><th>Belge</th><th>Giriş</th><th>Marka / Şube</th><th>Teknisyen</th><th>Servis nedeni</th><th>İşlemler</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
   `;
@@ -1717,7 +1725,7 @@ function renderHistory(){
 
   const completed = allRecords.filter(r=>r.status==='completed');
   const filtered = completed.filter(r=>{
-    if (fm && !r.musteri.toLowerCase().includes(fm)) return false;
+    if (fm && !((r.musteri||'') + ' ' + (r.marka||'')).toLowerCase().includes(fm)) return false;
     if (ft && !r.teknisyen.toLowerCase().includes(ft)) return false;
     if (fd && r.girisTarihi !== fd) return false;
     if (ftur && (r.kayitTuru || 'otomatik') !== ftur) return false;
@@ -1746,7 +1754,7 @@ function renderHistory(){
       <td class="sans">${turBadge}<br><span style="color:var(--slate-soft);font-size:.72rem;">${escapeHtml(r.belgeNo||'—')}</span></td>
       <td class="sans">${formatDate(r.girisTarihi)}<br><span style="color:var(--slate-soft);">${r.girisSaati} – ${r.cikisSaati||'—'}</span></td>
       <td class="sans">${formatDuration(r.girisISO, r.cikisISO)}</td>
-      <td class="sans cust">${escapeHtml(r.musteri)}</td>
+      <td class="sans cust">${r.marka ? escapeHtml(r.marka) + '<br><span style="font-weight:400;color:var(--slate-soft);">' + escapeHtml(r.musteri) + '</span>' : escapeHtml(r.musteri)}</td>
       <td class="sans">${escapeHtml(r.teknisyen)}</td>
       <td class="sans desc-cell" title="${escapeHtml(r.islem)}">${escapeHtml(r.islem || '—')}</td>
       <td>
@@ -1761,7 +1769,7 @@ function renderHistory(){
 
   wrap.innerHTML = `
     <table class="recs">
-      <thead><tr><th>Tür</th><th>Giriş / Çıkış</th><th>Süre</th><th>Müşteri / Mağaza</th><th>Teknisyen</th><th>Yapılan işlem</th><th>İşlemler</th></tr></thead>
+      <thead><tr><th>Tür</th><th>Giriş / Çıkış</th><th>Süre</th><th>Marka / Şube</th><th>Teknisyen</th><th>Yapılan işlem</th><th>İşlemler</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
   `;
@@ -1805,7 +1813,8 @@ document.getElementById('exportExcelBtn').addEventListener('click', ()=>{
       'Çıkış Saati': r.cikisSaati || '',
       'Süre': formatDuration(r.girisISO, r.cikisISO),
       'Teknisyen': r.teknisyen || '',
-      'Müşteri / Mağaza': r.musteri || '',
+      'Marka': r.marka || '',
+      'Mağaza / Şube': r.musteri || '',
       'Telefon': r.telefon || '',
       'Adres': r.adres || '',
       'Servis Nedeni': r.ariza || '',
@@ -1996,8 +2005,9 @@ function buildPdf(r){
   }
 
   fieldPair('Giriş tarihi / saati', `${formatDate(r.girisTarihi)}    ${r.girisSaati}`, 'Çıkış tarihi / saati', `${formatDate(r.cikisTarihi)}    ${r.cikisSaati || '—'}`);
-  fieldPair('Teknisyen', r.teknisyen, 'Müşteri / Mağaza', r.musteri);
-  fieldPair('Telefon', r.telefon, 'Adres', r.adres);
+  fieldPair('Marka', r.marka, 'Mağaza / Şube', r.musteri);
+  fieldPair('Teknisyen', r.teknisyen, 'Telefon', r.telefon);
+  field('Adres', r.adres);
 
   sectionDivider();
 
@@ -2099,6 +2109,7 @@ function openEditScreen(id){
   if (!r) return;
   currentEditingId = id;
   document.getElementById('e_belge_no').textContent = r.belgeNo || '—';
+  document.getElementById('e_marka_ozet').textContent = r.marka || '—';
 
   document.getElementById('e_teknisyen').value = r.teknisyen || '';
   document.getElementById('e_musteri').value = r.musteri || '';
