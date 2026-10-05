@@ -168,6 +168,7 @@
     color:var(--signal);border-radius:2px;padding:9px 10px;cursor:pointer;white-space:nowrap;
   }
 
+  #openWrap,#recWrap,#teslimatRecWrap,#brandsWrap{overflow-x:auto;}
   table.recs{width:100%;border-collapse:collapse;font-family:"Inter",sans-serif;font-size:.85rem;}
   table.recs th{text-align:left;font-weight:500;color:var(--slate-soft);font-size:.72rem;padding:0 10px 8px;border-bottom:1px solid var(--line);}
   table.recs td{padding:12px 10px;border-bottom:1px solid var(--line);vertical-align:top;}
@@ -1565,7 +1566,8 @@ function renderOpen(){
     <tr data-id="${r.id}">
       <td class="sans"><span class="badge open">AÇIK</span><br><span style="color:var(--slate-soft);font-size:.72rem;">${escapeHtml(r.belgeNo||'—')}</span></td>
       <td class="sans">${formatDate(r.girisTarihi)}<br><span style="color:var(--slate-soft);">${r.girisSaati}</span><br><span class="dur-badge ${dc}">${durLabel}</span></td>
-      <td class="sans cust">${r.marka ? escapeHtml(r.marka) + '<br><span style="font-weight:400;color:var(--slate-soft);">' + escapeHtml(r.musteri) + '</span>' : escapeHtml(r.musteri)}</td>
+      <td class="sans cust">${escapeHtml(r.marka || '—')}</td>
+      <td class="sans">${escapeHtml(r.musteri)}</td>
       <td class="sans">${escapeHtml(r.teknisyen)}</td>
       <td class="sans desc-cell" title="${escapeHtml(r.ariza)}">${escapeHtml(r.ariza || '—')}</td>
       <td>
@@ -1579,7 +1581,7 @@ function renderOpen(){
 
   wrap.innerHTML = `
     <table class="recs">
-      <thead><tr><th>Belge</th><th>Giriş</th><th>Marka / Şube</th><th>Teknisyen</th><th>Servis nedeni</th><th>İşlemler</th></tr></thead>
+      <thead><tr><th>Belge</th><th>Giriş</th><th>Marka</th><th>Mağaza / Şube</th><th>Teknisyen</th><th>Servis nedeni</th><th>İşlemler</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
   `;
@@ -1754,7 +1756,8 @@ function renderHistory(){
       <td class="sans">${turBadge}<br><span style="color:var(--slate-soft);font-size:.72rem;">${escapeHtml(r.belgeNo||'—')}</span></td>
       <td class="sans">${formatDate(r.girisTarihi)}<br><span style="color:var(--slate-soft);">${r.girisSaati} – ${r.cikisSaati||'—'}</span></td>
       <td class="sans">${formatDuration(r.girisISO, r.cikisISO)}</td>
-      <td class="sans cust">${r.marka ? escapeHtml(r.marka) + '<br><span style="font-weight:400;color:var(--slate-soft);">' + escapeHtml(r.musteri) + '</span>' : escapeHtml(r.musteri)}</td>
+      <td class="sans cust">${escapeHtml(r.marka || '—')}</td>
+      <td class="sans">${escapeHtml(r.musteri)}</td>
       <td class="sans">${escapeHtml(r.teknisyen)}</td>
       <td class="sans desc-cell" title="${escapeHtml(r.islem)}">${escapeHtml(r.islem || '—')}</td>
       <td>
@@ -1769,7 +1772,7 @@ function renderHistory(){
 
   wrap.innerHTML = `
     <table class="recs">
-      <thead><tr><th>Tür</th><th>Giriş / Çıkış</th><th>Süre</th><th>Marka / Şube</th><th>Teknisyen</th><th>Yapılan işlem</th><th>İşlemler</th></tr></thead>
+      <thead><tr><th>Tür</th><th>Giriş / Çıkış</th><th>Süre</th><th>Marka</th><th>Mağaza / Şube</th><th>Teknisyen</th><th>Yapılan işlem</th><th>İşlemler</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
   `;
